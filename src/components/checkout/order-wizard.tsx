@@ -1,0 +1,1215 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { z } from "zod";
+import { services, getService, formatPrice, type ServiceSlug } from "@/lib/services";
+import {
+  documentsSchema,
+  extras as extraOptions,
+  holderSchema,
+  insuranceSchema,
+  legalSchema,
+  plateSchema,
+  plateSizes,
+  sepaSchema,
+  shippingOptions,
+  vehicleSchema,
+} from "@/lib/order";
+import { districts } from "@/lib/districts";
+import { Button, Field, inputClass, Check } from "../ui";
+import { LicensePlate } from "../license-plate";
+import { OrderSummary } from "./order-summary";
+
+/* ------------------------------------------------------------------ Typen */
+
+type Draft = {
+  service: ServiceSlug;
+  plate: { district: string; letters: string; numbers: string };
+  plateSize: string;
+  extras: string[];
+  vehicle: {
+    vin: string;
+    zbTeil2: string;
+    make: string;
+    model: string;
+    firstRegistration: string;
+    huUntil: string;
+    previousPlate: string;
+  };
+  holder: {
+    salutation: "frau" | "herr" | "divers" | "firma";
+    company: string;
+    firstName: string;
+    lastName: string;
+    birthDate: string;
+    birthPlace: string;
+    street: string;
+    zip: string;
+    city: string;
+    email: string;
+    phone: string;
+  };
+  insurance: { evb: string; insurer: string };
+  sepa: { accountHolder: string; iban: string; mandate: boolean };
+  documents: { powerOfAttorney: boolean; signature: string };
+  shipping: {
+    method: string;
+    differentAddress: boolean;
+    street: string;
+    zip: string;
+    city: string;
+  };
+  legal: { terms: boolean; privacy: boolean };
+  note: string;
+};
+
+type Errors = Record<string, string>;
+
+const emptyDraft: Draft = {
+  service: "wunschkennzeichen",
+  plate: { district: "", letters: "", numbers: "" },
+  plateSize: "standard",
+  extras: [],
+  vehicle: {
+    vin: "",
+    zbTeil2: "",
+    make: "",
+    model: "",
+    firstRegistration: "",
+    huUntil: "",
+    previousPlate: "",
+  },
+  holder: {
+    salutation: "frau",
+    company: "",
+    firstName: "",
+    lastName: "",
+    birthDate: "",
+    birthPlace: "",
+    street: "",
+    zip: "",
+    city: "",
+    email: "",
+    phone: "",
+  },
+  insurance: { evb: "", insurer: "" },
+  sepa: { accountHolder: "", iban: "", mandate: false },
+  documents: { powerOfAttorney: false, signature: "" },
+  shipping: { method: "standard", differentAddress: false, street: "", zip: "", city: "" },
+  legal: { terms: false, privacy: false },
+  note: "",
+};
+
+const STORAGE_KEY = "kfz-portal:auftrag";
+
+/* -------------------------------------------------------------- Hilfsteile */
+
+function collect(error: z.ZodError, prefix: string): Errors {
+  const out: Errors = {};
+  for (const issue of error.issues) {
+    const key = `${prefix}.${issue.path.join(".")}`;
+    if (!out[key]) out[key] = issue.message;
+  }
+  return out;
+}
+
+function StepHeader({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="mb-7">
+      <h2 className="text-2xl font-semibold tracking-tight text-ink-900">{title}</h2>
+      <p className="mt-2 text-sm leading-relaxed text-ink-500">{text}</p>
+    </div>
+  );
+}
+
+function CheckboxRow({
+  id,
+  checked,
+  onChange,
+  label,
+  error,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: React.ReactNode;
+  error?: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="flex cursor-pointer items-start gap-3 text-sm text-ink-700">
+        <input
+          id={id}
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="mt-0.5 h-5 w-5 shrink-0 rounded border-line accent-[var(--color-brand-700)]"
+        />
+        <span className="leading-relaxed">{label}</span>
+      </label>
+      {error ? <p className="mt-1.5 pl-8 text-xs font-medium text-bad-700">{error}</p> : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ Wizard */
+
+export function OrderWizard() {
+  const params = useSearchParams();
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [step, setStep] = useState(0);
+  const [errors, setErrors] = useState<Errors>({});
+  const [files, setFiles] = useState<Record<string, File | null>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [restored, setRestored] = useState(false);
+
+  /* Vorbelegung aus URL + gespeichertem Entwurf */
+  useEffect(() => {
+    let base = emptyDraft;
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      if (saved) base = { ...emptyDraft, ...(JSON.parse(saved) as Draft) };
+    } catch {
+      /* Entwurf ignorieren */
+    }
+
+    const slug = params.get("leistung");
+    const service = services.find((s) => s.slug === slug)?.slug ?? base.service;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- einmalige Initialisierung aus URL und gespeichertem Entwurf
+    setDraft({
+      ...base,
+      service,
+      plate: {
+        district: (params.get("bezirk") ?? base.plate.district).toUpperCase(),
+        letters: (params.get("buchstaben") ?? base.plate.letters).toUpperCase(),
+        numbers: params.get("zahlen") ?? base.plate.numbers,
+      },
+    });
+    setRestored(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!restored) return;
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    } catch {
+      /* Speicher nicht verfügbar */
+    }
+  }, [draft, restored]);
+
+  const service = getService(draft.service)!;
+  const sections = service.sections;
+
+  const stepList = useMemo(() => {
+    const list: { id: string; label: string }[] = [
+      { id: "leistung", label: "Leistung" },
+    ];
+    if (sections.includes("vehicle")) list.push({ id: "fahrzeug", label: "Fahrzeug" });
+    list.push({ id: "halter", label: "Halter" });
+    if (sections.includes("documents")) list.push({ id: "unterlagen", label: "Unterlagen" });
+    list.push({ id: "uebersicht", label: "Prüfen & zahlen" });
+    return list;
+  }, [sections]);
+
+  const current = stepList[Math.min(step, stepList.length - 1)];
+
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+    setDraft((d) => ({ ...d, [key]: value }));
+
+  const patch = <K extends keyof Draft>(key: K, value: Partial<Draft[K]>) =>
+    setDraft((d) => ({ ...d, [key]: { ...(d[key] as object), ...value } as Draft[K] }));
+
+  const requiredUploads = useMemo(() => {
+    const list: { id: string; label: string; hint: string }[] = [];
+    if (sections.includes("documents")) {
+      list.push({
+        id: "ausweis",
+        label: "Ausweisdokument des Halters",
+        hint: "Personalausweis (Vorder- und Rückseite) oder Reisepass mit Meldebescheinigung.",
+      });
+      if (draft.service === "kfz-zulassung" || draft.service === "kfz-ummeldung") {
+        list.push({
+          id: "zb2",
+          label: "Zulassungsbescheinigung Teil II",
+          hint: "Früher „Fahrzeugbrief“. Bitte vollständig abfotografieren oder scannen.",
+        });
+      }
+      if (draft.service !== "kfz-zulassung") {
+        list.push({
+          id: "zb1",
+          label: "Zulassungsbescheinigung Teil I",
+          hint: "Früher „Fahrzeugschein“.",
+        });
+      }
+    }
+    return list;
+  }, [sections, draft.service]);
+
+  function validateStep(id: string): Errors {
+    let out: Errors = {};
+    if (id === "leistung" && sections.includes("plate")) {
+      const r = plateSchema.safeParse({ ...draft.plate, size: draft.plateSize });
+      if (!r.success) out = { ...out, ...collect(r.error, "plate") };
+    }
+    if (id === "fahrzeug") {
+      const r = vehicleSchema.safeParse(draft.vehicle);
+      if (!r.success) out = { ...out, ...collect(r.error, "vehicle") };
+    }
+    if (id === "halter") {
+      const r = holderSchema.safeParse(draft.holder);
+      if (!r.success) out = { ...out, ...collect(r.error, "holder") };
+      if (draft.holder.salutation === "firma" && !draft.holder.company.trim()) {
+        out["holder.company"] = "Bitte Firmennamen angeben";
+      }
+      if (sections.includes("insurance")) {
+        const ri = insuranceSchema.safeParse(draft.insurance);
+        if (!ri.success) out = { ...out, ...collect(ri.error, "insurance") };
+      }
+      if (sections.includes("sepa")) {
+        const rs = sepaSchema.safeParse(draft.sepa);
+        if (!rs.success) out = { ...out, ...collect(rs.error, "sepa") };
+      }
+    }
+    if (id === "unterlagen") {
+      const r = documentsSchema.safeParse(draft.documents);
+      if (!r.success) out = { ...out, ...collect(r.error, "documents") };
+      for (const doc of requiredUploads) {
+        if (!files[doc.id]) out[`file.${doc.id}`] = `Bitte ${doc.label} hochladen`;
+      }
+    }
+    if (id === "uebersicht") {
+      const r = legalSchema.safeParse(draft.legal);
+      if (!r.success) out = { ...out, ...collect(r.error, "legal") };
+    }
+    return out;
+  }
+
+
+  function next() {
+    const found = validateStep(current.id);
+    setErrors(found);
+    if (Object.keys(found).length > 0) {
+      document.getElementById("wizard-top")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+    setStep((s) => Math.min(s + 1, stepList.length - 1));
+    document.getElementById("wizard-top")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function back() {
+    setErrors({});
+    setStep((s) => Math.max(0, s - 1));
+    document.getElementById("wizard-top")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  async function submit() {
+    const found = validateStep("uebersicht");
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const form = new FormData();
+      form.append(
+        "payload",
+        JSON.stringify({
+          service: draft.service,
+          plate: sections.includes("plate") ? draft.plate : undefined,
+          vehicle: sections.includes("vehicle") ? draft.vehicle : undefined,
+          holder: draft.holder,
+          insurance: sections.includes("insurance") ? draft.insurance : undefined,
+          sepa: sections.includes("sepa") ? draft.sepa : undefined,
+          documents: sections.includes("documents") ? draft.documents : undefined,
+          shipping: sections.includes("shipping") ? draft.shipping : undefined,
+          extras: draft.extras,
+          plateSize: draft.plateSize,
+          shippingMethod: draft.shipping.method,
+          legal: draft.legal,
+          note: draft.note,
+        }),
+      );
+      for (const [key, file] of Object.entries(files)) {
+        if (file) form.append(`datei_${key}`, file, file.name);
+      }
+
+      const orderRes = await fetch("/api/bestellung", { method: "POST", body: form });
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) throw new Error(orderData?.error ?? "Auftrag konnte nicht angelegt werden.");
+
+      const payRes = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: orderData.orderId }),
+      });
+      const payData = await payRes.json();
+      if (!payRes.ok || !payData?.url) {
+        throw new Error(payData?.error ?? "Die Zahlung konnte nicht gestartet werden.");
+      }
+
+      sessionStorage.removeItem(STORAGE_KEY);
+      window.location.assign(payData.url as string);
+    } catch (e) {
+      setSubmitError(
+        e instanceof Error ? e.message : "Unbekannter Fehler bei der Übermittlung.",
+      );
+      setSubmitting(false);
+    }
+  }
+
+  const selection = {
+    service: draft.service,
+    plateSize: draft.plateSize,
+    extras: draft.extras,
+    shipping: draft.shipping.method,
+  };
+
+  return (
+    <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div id="wizard-top" className="scroll-mt-28">
+        {/* Fortschritt */}
+        <ol className="mb-9 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+          {stepList.map((s, i) => {
+            const state = i < step ? "done" : i === step ? "current" : "todo";
+            return (
+              <li key={s.id} className="flex items-center gap-3">
+                <span
+                  className={`flex items-center gap-2 rounded-full px-3 py-1.5 font-medium ${
+                    state === "current"
+                      ? "bg-brand-700 text-white"
+                      : state === "done"
+                        ? "bg-ok-100 text-ok-700"
+                        : "bg-surface text-ink-500"
+                  }`}
+                >
+                  <span className="grid h-5 w-5 place-items-center rounded-full bg-white/25 text-xs">
+                    {state === "done" ? "✓" : i + 1}
+                  </span>
+                  {s.label}
+                </span>
+                {i < stepList.length - 1 ? (
+                  <span aria-hidden="true" className="hidden h-px w-6 bg-line sm:block" />
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+
+        {Object.keys(errors).length > 0 ? (
+          <div role="alert" className="mb-7 rounded-lg border border-bad-700/25 bg-bad-100 p-4">
+            <p className="text-sm font-semibold text-bad-700">
+              Bitte prüfen Sie die markierten Felder
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-bad-700">
+              {Object.entries(errors).map(([key, message]) => (
+                <li key={key}>{message}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {/* ------------------------------------------------ Schritt: Leistung */}
+        {current.id === "leistung" ? (
+          <section>
+            <StepHeader
+              title="Leistung und Kennzeichen"
+              text="Wählen Sie den Vorgang aus und legen Sie fest, welches Kennzeichen wir für Sie sichern sollen."
+            />
+
+            <fieldset className="mb-8">
+              <legend className="mb-3 text-sm font-semibold text-ink-900">Vorgang</legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {services.map((s) => (
+                  <label
+                    key={s.slug}
+                    className={`flex cursor-pointer gap-3 rounded-lg border p-4 transition-colors ${
+                      draft.service === s.slug
+                        ? "border-brand-600 bg-brand-50"
+                        : "border-line hover:border-brand-200"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="service"
+                      value={s.slug}
+                      checked={draft.service === s.slug}
+                      onChange={() => {
+                        set("service", s.slug);
+                        setStep(0);
+                      }}
+                      className="mt-1 h-4 w-4 accent-[var(--color-brand-700)]"
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-ink-900">{s.title}</span>
+                      <span className="block text-xs text-ink-500">{s.short}</span>
+                      <span className="mt-1 block text-sm font-semibold text-brand-700">
+                        {formatPrice(s.price)}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            {sections.includes("plate") ? (
+              <>
+                <fieldset className="mb-8">
+                  <legend className="mb-3 text-sm font-semibold text-ink-900">
+                    Ihr Wunschkennzeichen
+                  </legend>
+                  <div className="grid grid-cols-3 gap-3 sm:max-w-md">
+                    <Field label="Ort" htmlFor="w-district" required error={errors["plate.district"]}>
+                      <input
+                        id="w-district"
+                        list="w-districts"
+                        maxLength={3}
+                        value={draft.plate.district}
+                        onChange={(e) =>
+                          patch("plate", {
+                            district: e.target.value.toUpperCase().replace(/[^A-ZÄÖÜ]/g, ""),
+                          })
+                        }
+                        className={`${inputClass} text-center text-lg font-bold uppercase`}
+                      />
+                      <datalist id="w-districts">
+                        {districts.slice(0, 400).map((d) => (
+                          <option key={`${d.code}-${d.city}`} value={d.code}>
+                            {d.city}
+                          </option>
+                        ))}
+                      </datalist>
+                    </Field>
+                    <Field label="Buchst." htmlFor="w-letters" required error={errors["plate.letters"]}>
+                      <input
+                        id="w-letters"
+                        maxLength={2}
+                        value={draft.plate.letters}
+                        onChange={(e) =>
+                          patch("plate", {
+                            letters: e.target.value.toUpperCase().replace(/[^A-ZÄÖÜ]/g, ""),
+                          })
+                        }
+                        className={`${inputClass} text-center text-lg font-bold uppercase`}
+                      />
+                    </Field>
+                    <Field label="Zahlen" htmlFor="w-numbers" required error={errors["plate.numbers"]}>
+                      <input
+                        id="w-numbers"
+                        maxLength={4}
+                        inputMode="numeric"
+                        value={draft.plate.numbers}
+                        onChange={(e) =>
+                          patch("plate", { numbers: e.target.value.replace(/[^0-9]/g, "") })
+                        }
+                        className={`${inputClass} text-center text-lg font-bold`}
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="mt-5">
+                    <LicensePlate
+                      district={draft.plate.district}
+                      letters={draft.plate.letters}
+                      numbers={draft.plate.numbers}
+                    />
+                  </div>
+                </fieldset>
+
+                <fieldset className="mb-8">
+                  <legend className="mb-3 text-sm font-semibold text-ink-900">Schildergröße</legend>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {plateSizes.map((size) => (
+                      <label
+                        key={size.id}
+                        className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 ${
+                          draft.plateSize === size.id
+                            ? "border-brand-600 bg-brand-50"
+                            : "border-line hover:border-brand-200"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="plateSize"
+                          checked={draft.plateSize === size.id}
+                          onChange={() => set("plateSize", size.id)}
+                          className="mt-1 h-4 w-4 accent-[var(--color-brand-700)]"
+                        />
+                        <span>
+                          <span className="block text-sm font-medium text-ink-900">{size.label}</span>
+                          <span className="block text-xs text-ink-500">{size.description}</span>
+                          <span className="mt-1 block text-xs font-semibold text-brand-700">
+                            {size.price === 0 ? "inklusive" : `+ ${formatPrice(size.price)}`}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              </>
+            ) : null}
+
+            <fieldset className="mb-8">
+              <legend className="mb-3 text-sm font-semibold text-ink-900">
+                Zusatzleistungen (optional)
+              </legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {extraOptions.map((extra) => {
+                  const active = draft.extras.includes(extra.id);
+                  return (
+                    <label
+                      key={extra.id}
+                      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 ${
+                        active ? "border-brand-600 bg-brand-50" : "border-line hover:border-brand-200"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={active}
+                        onChange={(e) =>
+                          set(
+                            "extras",
+                            e.target.checked
+                              ? [...draft.extras, extra.id]
+                              : draft.extras.filter((x) => x !== extra.id),
+                          )
+                        }
+                        className="mt-1 h-4 w-4 accent-[var(--color-brand-700)]"
+                      />
+                      <span>
+                        <span className="block text-sm font-medium text-ink-900">{extra.label}</span>
+                        <span className="block text-xs text-ink-500">{extra.description}</span>
+                        <span className="mt-1 block text-xs font-semibold text-brand-700">
+                          + {formatPrice(extra.price)}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          </section>
+        ) : null}
+
+        {/* ------------------------------------------------ Schritt: Fahrzeug */}
+        {current.id === "fahrzeug" ? (
+          <section>
+            <StepHeader
+              title="Fahrzeugdaten"
+              text="Die Angaben finden Sie in der Zulassungsbescheinigung. Wir gleichen sie vor der Einreichung mit Ihren Unterlagen ab."
+            />
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field
+                label="Fahrzeug-Identifizierungsnummer (FIN)"
+                htmlFor="v-vin"
+                required
+                hint="17 Zeichen, Feld E der Zulassungsbescheinigung."
+                error={errors["vehicle.vin"]}
+                className="sm:col-span-2"
+              >
+                <input
+                  id="v-vin"
+                  maxLength={17}
+                  value={draft.vehicle.vin}
+                  onChange={(e) => patch("vehicle", { vin: e.target.value.toUpperCase() })}
+                  className={`${inputClass} font-mono uppercase tracking-wider`}
+                />
+              </Field>
+
+              <Field
+                label="Nummer der Zulassungsbescheinigung Teil II"
+                htmlFor="v-zb2"
+                required
+                error={errors["vehicle.zbTeil2"]}
+              >
+                <input
+                  id="v-zb2"
+                  value={draft.vehicle.zbTeil2}
+                  onChange={(e) => patch("vehicle", { zbTeil2: e.target.value.toUpperCase() })}
+                  className={`${inputClass} font-mono uppercase`}
+                />
+              </Field>
+
+              <Field label="Bisheriges Kennzeichen" htmlFor="v-prev" hint="Nur bei Gebrauchtfahrzeugen.">
+                <input
+                  id="v-prev"
+                  value={draft.vehicle.previousPlate}
+                  onChange={(e) => patch("vehicle", { previousPlate: e.target.value.toUpperCase() })}
+                  className={`${inputClass} uppercase`}
+                />
+              </Field>
+
+              <Field label="Hersteller" htmlFor="v-make" required error={errors["vehicle.make"]}>
+                <input
+                  id="v-make"
+                  value={draft.vehicle.make}
+                  onChange={(e) => patch("vehicle", { make: e.target.value })}
+                  className={inputClass}
+                />
+              </Field>
+
+              <Field label="Modell" htmlFor="v-model" required error={errors["vehicle.model"]}>
+                <input
+                  id="v-model"
+                  value={draft.vehicle.model}
+                  onChange={(e) => patch("vehicle", { model: e.target.value })}
+                  className={inputClass}
+                />
+              </Field>
+
+              <Field label="Erstzulassung" htmlFor="v-first">
+                <input
+                  id="v-first"
+                  type="date"
+                  value={draft.vehicle.firstRegistration}
+                  onChange={(e) => patch("vehicle", { firstRegistration: e.target.value })}
+                  className={inputClass}
+                />
+              </Field>
+
+              <Field label="Hauptuntersuchung gültig bis" htmlFor="v-hu">
+                <input
+                  id="v-hu"
+                  type="month"
+                  value={draft.vehicle.huUntil}
+                  onChange={(e) => patch("vehicle", { huUntil: e.target.value })}
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+          </section>
+        ) : null}
+
+        {/* -------------------------------------------------- Schritt: Halter */}
+        {current.id === "halter" ? (
+          <section className="space-y-10">
+            <div>
+              <StepHeader
+                title="Halterdaten"
+                text="Die Angaben müssen mit dem Ausweisdokument übereinstimmen, das Sie im nächsten Schritt hochladen."
+              />
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label="Anrede" htmlFor="h-salutation" required>
+                  <select
+                    id="h-salutation"
+                    value={draft.holder.salutation}
+                    onChange={(e) =>
+                      patch("holder", { salutation: e.target.value as Draft["holder"]["salutation"] })
+                    }
+                    className={inputClass}
+                  >
+                    <option value="frau">Frau</option>
+                    <option value="herr">Herr</option>
+                    <option value="divers">Keine Angabe</option>
+                    <option value="firma">Firma</option>
+                  </select>
+                </Field>
+
+                {draft.holder.salutation === "firma" ? (
+                  <Field label="Firmenname" htmlFor="h-company" required error={errors["holder.company"]}>
+                    <input
+                      id="h-company"
+                      value={draft.holder.company}
+                      onChange={(e) => patch("holder", { company: e.target.value })}
+                      className={inputClass}
+                    />
+                  </Field>
+                ) : (
+                  <div className="hidden sm:block" />
+                )}
+
+                <Field label="Vorname" htmlFor="h-first" required error={errors["holder.firstName"]}>
+                  <input
+                    id="h-first"
+                    autoComplete="given-name"
+                    value={draft.holder.firstName}
+                    onChange={(e) => patch("holder", { firstName: e.target.value })}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Nachname" htmlFor="h-last" required error={errors["holder.lastName"]}>
+                  <input
+                    id="h-last"
+                    autoComplete="family-name"
+                    value={draft.holder.lastName}
+                    onChange={(e) => patch("holder", { lastName: e.target.value })}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Geburtsdatum" htmlFor="h-birth">
+                  <input
+                    id="h-birth"
+                    type="date"
+                    value={draft.holder.birthDate}
+                    onChange={(e) => patch("holder", { birthDate: e.target.value })}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Geburtsort" htmlFor="h-birthplace">
+                  <input
+                    id="h-birthplace"
+                    value={draft.holder.birthPlace}
+                    onChange={(e) => patch("holder", { birthPlace: e.target.value })}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field
+                  label="Straße und Hausnummer"
+                  htmlFor="h-street"
+                  required
+                  error={errors["holder.street"]}
+                  className="sm:col-span-2"
+                >
+                  <input
+                    id="h-street"
+                    autoComplete="street-address"
+                    value={draft.holder.street}
+                    onChange={(e) => patch("holder", { street: e.target.value })}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="PLZ" htmlFor="h-zip" required error={errors["holder.zip"]}>
+                  <input
+                    id="h-zip"
+                    inputMode="numeric"
+                    maxLength={5}
+                    autoComplete="postal-code"
+                    value={draft.holder.zip}
+                    onChange={(e) => patch("holder", { zip: e.target.value.replace(/[^0-9]/g, "") })}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Ort" htmlFor="h-city" required error={errors["holder.city"]}>
+                  <input
+                    id="h-city"
+                    autoComplete="address-level2"
+                    value={draft.holder.city}
+                    onChange={(e) => patch("holder", { city: e.target.value })}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="E-Mail" htmlFor="h-email" required error={errors["holder.email"]}>
+                  <input
+                    id="h-email"
+                    type="email"
+                    autoComplete="email"
+                    value={draft.holder.email}
+                    onChange={(e) => patch("holder", { email: e.target.value })}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field
+                  label="Telefon"
+                  htmlFor="h-phone"
+                  required
+                  hint="Nur für Rückfragen zum Vorgang."
+                  error={errors["holder.phone"]}
+                >
+                  <input
+                    id="h-phone"
+                    type="tel"
+                    autoComplete="tel"
+                    value={draft.holder.phone}
+                    onChange={(e) => patch("holder", { phone: e.target.value })}
+                    className={inputClass}
+                  />
+                </Field>
+              </div>
+            </div>
+
+            {sections.includes("insurance") ? (
+              <div>
+                <h3 className="text-lg font-semibold text-ink-900">Versicherung</h3>
+                <p className="mt-1.5 text-sm text-ink-500">
+                  Die eVB-Nummer erhalten Sie von Ihrer Kfz-Versicherung – ohne sie
+                  ist keine Zulassung möglich.
+                </p>
+                <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                  <Field label="eVB-Nummer" htmlFor="i-evb" required error={errors["insurance.evb"]}>
+                    <input
+                      id="i-evb"
+                      maxLength={7}
+                      value={draft.insurance.evb}
+                      onChange={(e) => patch("insurance", { evb: e.target.value.toUpperCase() })}
+                      className={`${inputClass} font-mono uppercase tracking-widest`}
+                    />
+                  </Field>
+                  <Field label="Versicherungsgesellschaft" htmlFor="i-insurer">
+                    <input
+                      id="i-insurer"
+                      value={draft.insurance.insurer}
+                      onChange={(e) => patch("insurance", { insurer: e.target.value })}
+                      className={inputClass}
+                    />
+                  </Field>
+                </div>
+              </div>
+            ) : null}
+
+            {sections.includes("sepa") ? (
+              <div>
+                <h3 className="text-lg font-semibold text-ink-900">
+                  SEPA-Mandat für die Kfz-Steuer
+                </h3>
+                <p className="mt-1.5 text-sm text-ink-500">
+                  Die Kfz-Steuer wird vom Hauptzollamt eingezogen. Ein gültiges
+                  SEPA-Mandat ist gesetzlich Voraussetzung für die Zulassung.
+                </p>
+                <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                  <Field
+                    label="Kontoinhaber"
+                    htmlFor="s-holder"
+                    required
+                    error={errors["sepa.accountHolder"]}
+                  >
+                    <input
+                      id="s-holder"
+                      value={draft.sepa.accountHolder}
+                      onChange={(e) => patch("sepa", { accountHolder: e.target.value })}
+                      className={inputClass}
+                    />
+                  </Field>
+                  <Field label="IBAN" htmlFor="s-iban" required error={errors["sepa.iban"]}>
+                    <input
+                      id="s-iban"
+                      value={draft.sepa.iban}
+                      onChange={(e) => patch("sepa", { iban: e.target.value.toUpperCase() })}
+                      className={`${inputClass} font-mono uppercase`}
+                    />
+                  </Field>
+                  <div className="sm:col-span-2">
+                    <CheckboxRow
+                      id="s-mandate"
+                      checked={draft.sepa.mandate}
+                      onChange={(v) => patch("sepa", { mandate: v })}
+                      error={errors["sepa.mandate"]}
+                      label="Ich ermächtige das zuständige Hauptzollamt, die Kfz-Steuer von meinem Konto einzuziehen, und weise mein Kreditinstitut an, die Lastschriften einzulösen."
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {sections.includes("shipping") ? (
+              <div>
+                <h3 className="text-lg font-semibold text-ink-900">Versand</h3>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  {shippingOptions.map((opt) => (
+                    <label
+                      key={opt.id}
+                      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 ${
+                        draft.shipping.method === opt.id
+                          ? "border-brand-600 bg-brand-50"
+                          : "border-line hover:border-brand-200"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="shippingMethod"
+                        checked={draft.shipping.method === opt.id}
+                        onChange={() => patch("shipping", { method: opt.id })}
+                        className="mt-1 h-4 w-4 accent-[var(--color-brand-700)]"
+                      />
+                      <span>
+                        <span className="block text-sm font-medium text-ink-900">{opt.label}</span>
+                        <span className="block text-xs text-ink-500">{opt.description}</span>
+                        <span className="mt-1 block text-xs font-semibold text-brand-700">
+                          {opt.price === 0 ? "inklusive" : `+ ${formatPrice(opt.price)}`}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="mt-5">
+                  <CheckboxRow
+                    id="ship-diff"
+                    checked={draft.shipping.differentAddress}
+                    onChange={(v) => patch("shipping", { differentAddress: v })}
+                    label="Lieferung an eine abweichende Adresse"
+                  />
+                </div>
+
+                {draft.shipping.differentAddress ? (
+                  <div className="mt-5 grid gap-5 sm:grid-cols-3">
+                    <Field label="Straße und Hausnummer" htmlFor="sh-street" className="sm:col-span-3">
+                      <input
+                        id="sh-street"
+                        value={draft.shipping.street}
+                        onChange={(e) => patch("shipping", { street: e.target.value })}
+                        className={inputClass}
+                      />
+                    </Field>
+                    <Field label="PLZ" htmlFor="sh-zip">
+                      <input
+                        id="sh-zip"
+                        maxLength={5}
+                        value={draft.shipping.zip}
+                        onChange={(e) =>
+                          patch("shipping", { zip: e.target.value.replace(/[^0-9]/g, "") })
+                        }
+                        className={inputClass}
+                      />
+                    </Field>
+                    <Field label="Ort" htmlFor="sh-city" className="sm:col-span-2">
+                      <input
+                        id="sh-city"
+                        value={draft.shipping.city}
+                        onChange={(e) => patch("shipping", { city: e.target.value })}
+                        className={inputClass}
+                      />
+                    </Field>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {/* ---------------------------------------------- Schritt: Unterlagen */}
+        {current.id === "unterlagen" ? (
+          <section>
+            <StepHeader
+              title="Unterlagen und Vollmacht"
+              text="Laden Sie die Dokumente als Foto oder PDF hoch. Die Dateien werden verschlüsselt übertragen und nach Abschluss des Vorgangs gelöscht."
+            />
+
+            <div className="space-y-4">
+              {requiredUploads.map((doc) => (
+                <div key={doc.id} className="rounded-lg border border-line p-5">
+                  <label htmlFor={`file-${doc.id}`} className="block text-sm font-semibold text-ink-900">
+                    {doc.label} <span className="text-bad-700">*</span>
+                  </label>
+                  <p className="mt-1 text-xs text-ink-500">{doc.hint}</p>
+                  <input
+                    id={`file-${doc.id}`}
+                    type="file"
+                    accept="image/jpeg,image/png,image/heic,application/pdf"
+                    onChange={(e) =>
+                      setFiles((f) => ({ ...f, [doc.id]: e.target.files?.[0] ?? null }))
+                    }
+                    className="mt-3 block w-full text-sm text-ink-700 file:mr-4 file:rounded-md file:border-0 file:bg-brand-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-800"
+                  />
+                  {files[doc.id] ? (
+                    <p className="mt-2 flex items-center gap-2 text-xs font-medium text-ok-700">
+                      <Check className="h-4 w-4" />
+                      {files[doc.id]?.name} ({Math.round((files[doc.id]?.size ?? 0) / 1024)} KB)
+                    </p>
+                  ) : null}
+                  {errors[`file.${doc.id}`] ? (
+                    <p className="mt-2 text-xs font-medium text-bad-700">
+                      {errors[`file.${doc.id}`]}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 rounded-lg border border-line bg-surface p-6">
+              <h3 className="text-base font-semibold text-ink-900">Vollmacht</h3>
+              <p className="mt-2 text-sm leading-relaxed text-ink-500">
+                Hiermit bevollmächtige ich den Anbieter, mich gegenüber der
+                zuständigen Zulassungsbehörde in allen Angelegenheiten dieses
+                Vorgangs zu vertreten, Erklärungen abzugeben und entgegenzunehmen
+                sowie Gebühren in meinem Namen zu verauslagen.
+              </p>
+
+              <div className="mt-5">
+                <CheckboxRow
+                  id="d-poa"
+                  checked={draft.documents.powerOfAttorney}
+                  onChange={(v) => patch("documents", { powerOfAttorney: v })}
+                  error={errors["documents.powerOfAttorney"]}
+                  label="Ich erteile die Vollmacht in der oben stehenden Fassung."
+                />
+              </div>
+
+              <Field
+                label="Unterschrift (Vor- und Nachname tippen)"
+                htmlFor="d-sign"
+                required
+                hint="Die getippte Unterschrift wird der Vollmacht beigefügt. Eine handschriftliche Unterschrift fordern wir nur an, wenn die Behörde sie verlangt."
+                error={errors["documents.signature"]}
+                className="mt-6 max-w-sm"
+              >
+                <input
+                  id="d-sign"
+                  value={draft.documents.signature}
+                  onChange={(e) => patch("documents", { signature: e.target.value })}
+                  className={`${inputClass} font-serif text-lg italic`}
+                />
+              </Field>
+            </div>
+          </section>
+        ) : null}
+
+        {/* ---------------------------------------------- Schritt: Übersicht */}
+        {current.id === "uebersicht" ? (
+          <section>
+            <StepHeader
+              title="Prüfen und bezahlen"
+              text="Bitte kontrollieren Sie Ihre Angaben. Nach der Zahlung starten wir sofort mit der Bearbeitung."
+            />
+
+            <dl className="divide-y divide-line rounded-[var(--radius-card)] border border-line">
+              <Row label="Leistung" value={service.title} />
+              {sections.includes("plate") ? (
+                <Row
+                  label="Kennzeichen"
+                  value={`${draft.plate.district}-${draft.plate.letters} ${draft.plate.numbers}`}
+                />
+              ) : null}
+              {sections.includes("vehicle") ? (
+                <Row
+                  label="Fahrzeug"
+                  value={`${draft.vehicle.make} ${draft.vehicle.model} · FIN ${draft.vehicle.vin}`}
+                />
+              ) : null}
+              <Row
+                label="Halter"
+                value={`${draft.holder.firstName} ${draft.holder.lastName}, ${draft.holder.street}, ${draft.holder.zip} ${draft.holder.city}`}
+              />
+              <Row label="Kontakt" value={`${draft.holder.email} · ${draft.holder.phone}`} />
+              {sections.includes("insurance") ? (
+                <Row label="eVB-Nummer" value={draft.insurance.evb} />
+              ) : null}
+              {sections.includes("sepa") ? (
+                <Row
+                  label="SEPA-Mandat"
+                  value={`${draft.sepa.accountHolder} · ${draft.sepa.iban.replace(
+                    /^(.{4}).*(.{4})$/,
+                    "$1 •••• •••• $2",
+                  )}`}
+                />
+              ) : null}
+            </dl>
+
+            <Field
+              label="Nachricht an unser Team (optional)"
+              htmlFor="note"
+              className="mt-8"
+              hint="Zum Beispiel Wunschtermin, Besonderheiten am Fahrzeug oder abweichender Rechnungsempfänger."
+            >
+              <textarea
+                id="note"
+                rows={4}
+                maxLength={2000}
+                value={draft.note}
+                onChange={(e) => set("note", e.target.value)}
+                className={inputClass}
+              />
+            </Field>
+
+            <div className="mt-8 space-y-4 rounded-lg border border-line bg-surface p-6">
+              <CheckboxRow
+                id="l-terms"
+                checked={draft.legal.terms}
+                onChange={(v) => patch("legal", { terms: v })}
+                error={errors["legal.terms"]}
+                label={
+                  <>
+                    Ich habe die{" "}
+                    <Link href="/agb" className="font-semibold text-brand-700 underline">
+                      AGB
+                    </Link>{" "}
+                    und die{" "}
+                    <Link href="/widerruf" className="font-semibold text-brand-700 underline">
+                      Widerrufsbelehrung
+                    </Link>{" "}
+                    gelesen. Mir ist bekannt, dass mein Widerrufsrecht erlischt,
+                    sobald der Vorgang bei der Behörde eingereicht ist.
+                  </>
+                }
+              />
+              <CheckboxRow
+                id="l-privacy"
+                checked={draft.legal.privacy}
+                onChange={(v) => patch("legal", { privacy: v })}
+                error={errors["legal.privacy"]}
+                label={
+                  <>
+                    Ich willige in die Verarbeitung meiner Daten gemäß der{" "}
+                    <Link href="/datenschutz" className="font-semibold text-brand-700 underline">
+                      Datenschutzerklärung
+                    </Link>{" "}
+                    zum Zweck der Auftragsabwicklung ein.
+                  </>
+                }
+              />
+            </div>
+
+            <div className="mt-8 rounded-lg border border-line p-6">
+              <h3 className="text-base font-semibold text-ink-900">Zahlungsart</h3>
+              <p className="mt-2 text-sm text-ink-500">
+                Die Zahlung läuft über unseren Zahlungsdienstleister. Im nächsten
+                Schritt wählen Sie zwischen Kreditkarte, PayPal, Klarna,
+                SEPA-Lastschrift, Apple Pay und Google Pay.
+              </p>
+              <ul className="mt-4 flex flex-wrap gap-2">
+                {["Kreditkarte", "PayPal", "Klarna", "SEPA", "Apple Pay", "Google Pay"].map((p) => (
+                  <li
+                    key={p}
+                    className="rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-medium text-ink-700"
+                  >
+                    {p}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {submitError ? (
+              <p role="alert" className="mt-6 rounded-lg bg-bad-100 px-4 py-3 text-sm font-medium text-bad-700">
+                {submitError}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
+        {/* ------------------------------------------------------ Navigation */}
+        <div className="mt-10 flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
+          {step > 0 ? (
+            <Button type="button" variant="secondary" onClick={back}>
+              ← Zurück
+            </Button>
+          ) : (
+            <span />
+          )}
+
+          {current.id === "uebersicht" ? (
+            <Button type="button" size="lg" onClick={() => void submit()} disabled={submitting}>
+              {submitting ? "Wird übermittelt …" : "Zahlungspflichtig bestellen"}
+            </Button>
+          ) : (
+            <Button type="button" size="lg" onClick={next}>
+              Weiter →
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <OrderSummary selection={selection} plate={draft.plate} />
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:gap-6">
+      <dt className="w-44 shrink-0 text-sm text-ink-500">{label}</dt>
+      <dd className="text-sm font-medium text-ink-900">{value || "–"}</dd>
+    </div>
+  );
+}
