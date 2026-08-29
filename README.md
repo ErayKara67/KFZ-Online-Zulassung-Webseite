@@ -36,7 +36,7 @@ Serverkonsole, die Zahlung springt direkt auf die Erfolgsseite.
 |---|---|
 | **Sofortzulassung (i-Kfz Stufe 4)** | Eigener Bestellweg mit Vorprüfung, Sicherheitscodes, elektronischer Identifizierung, Express-Schilderlogistik, automatisiertem Bescheid und vorläufigem Zulassungsnachweis |
 | **Auftragsverfolgung** | Statusseite mit Zugriffscode, Zeitstrahl, Countdown für Abruffenster und Zehn-Tage-Frist, PDF-Download |
-| Verfügbarkeitsprüfung | Live-Prüfung mit Formatvalidierung nach FZV, Sperrkombinationen, Alternativvorschlägen und Kennzeichen-Vorschau |
+| Kennzeichenprüfung | Formatvalidierung nach FZV, bundesland-abhängige Sperren, Kennzeichen-Vorschau; Verfügbarkeit nur mit angebundener Schnittstelle (siehe Abschnitt 4) |
 | Leistungen | Wunschkennzeichen, Zulassung, Ummeldung, Abmeldung, Adressänderung, Umweltplakette – je mit eigener Landingpage |
 | Bestellprozess | Mehrstufiger Assistent: Leistung → Fahrzeug → Halter/Versicherung/SEPA → Unterlagen & Vollmacht → Prüfen & zahlen |
 | Validierung | FIN (17 Zeichen), eVB (7 Zeichen), IBAN, PLZ, Pflichtfelder – client- und serverseitig mit denselben Zod-Schemata |
@@ -216,30 +216,54 @@ eingehängt.
 
 ---
 
-## 4. Echte Verfügbarkeitsprüfung anbinden
+## 4. Kennzeichenprüfung: was echt ist und was nicht
 
-Aktuell prüft `src/lib/plate.ts` das Format vollständig korrekt (Länge,
-Buchstaben-/Ziffernaufbau, führende Null, Gesamtlänge, gesperrte
-Kombinationen) und liefert die Verfügbarkeit über einen stabilen Hash – im
-Demobetrieb ist damit jede Kombination reproduzierbar frei oder vergeben.
+**Echt und belastbar** ist die Formprüfung in `src/lib/plate.ts`: 1 bis 3
+Buchstaben Unterscheidungszeichen, 1 bis 2 Buchstaben und 1 bis 4 Ziffern im
+Erkennungsteil, höchstens 8 Zeichen insgesamt, keine führende Null.
 
-Für den Echtbetrieb nur eine Stelle ersetzen:
+**Echt, aber bewusst nicht abschließend** sind die Sperren in
+`src/lib/plate-rules.ts`. Bundesweit gesperrt sind nach § 8 FZV nur fünf
+Buchstabenkombinationen: HJ, KZ, NS, SA, SS. Alles Weitere legen die Länder und
+teilweise einzelne Bezirke fest – hinterlegt sind die bekannten Zusatzregeln für
+Hamburg (SD), Nordrhein-Westfalen (K-Z), Bayern (AH/HH mit 18/88/28, Nürnberg
+N-PD und N-SU) und Brandenburg (14, 18, 28, 88, 188, 1888, 8888, 8188).
+Zahlen mit einschlägiger Bedeutung erzeugen außerhalb dieser Länder einen
+**Hinweis, keine Sperre** – sonst würden zulässige Kombinationen abgewiesen.
+Die letzte Entscheidung trifft immer die Zulassungsbehörde.
 
-```ts
-// src/lib/plate.ts
-export function availabilityOf(input: PlateInput) { … }
+**Nicht vorhanden ohne Anbindung ist die Verfügbarkeit.** Es gibt keine
+öffentliche Datenquelle für den Kennzeichenbestand. Ohne konfigurierte
+Schnittstelle liefert die Prüfung deshalb den Status `formal_ok` und die
+Anwendung sagt wörtlich, dass die Verfügbarkeit noch offen ist. Sie behauptet
+nichts, was sie nicht weiß.
+
+Zum Anbinden genügen zwei Variablen:
+
+```bash
+PLATE_CHECK_URL="https://api.ihr-partner.de/v1"
+PLATE_CHECK_TOKEN="..."
 ```
 
-bzw. den Aufruf in `src/app/api/kennzeichen/route.ts`. Dort die Schnittstelle
-Ihres Reservierungsdienstleisters oder der jeweiligen Zulassungsbehörde
-aufrufen. Die Antwortstruktur (`PlateResult`) bleibt unverändert, das Frontend
-muss nicht angefasst werden.
+Erwartet wird `POST {PLATE_CHECK_URL}/verfuegbarkeit` mit
+`{ districtCode, letters, digits }` und einer Antwort mit `available: boolean`
+(oder `state: "AVAILABLE" | "TAKEN" | "RESERVED"`). Feldnamen bei Bedarf in
+`src/lib/plate-availability.ts` anpassen. Fällt die Schnittstelle aus, wird das
+Ergebnis auf `formal_ok` zurückgestuft – eine Störung darf nie als „vergeben“
+beim Kunden ankommen.
 
-Die Liste der Unterscheidungszeichen in `src/lib/districts.ts` ist ein Auszug
-der gebräuchlichsten Kürzel. Für den Produktivbetrieb empfiehlt sich der
-vollständige Datensatz des Kraftfahrt-Bundesamts.
+### Die Kürzelliste ist ein Auszug
 
----
+`src/lib/districts.ts` enthält 337 Unterscheidungszeichen. In Deutschland gibt
+es durch die Kennzeichenliberalisierung deutlich mehr – gängige Kürzel wie PCH,
+ANA, WSF, OHA, LOS, TS oder AÖ fehlen. Ein unbekanntes Kürzel führt deshalb
+**nicht** zur Ablehnung, sondern nur zu einem Hinweis.
+
+Für den Livegang die vollständige Liste einpflegen. Quelle ist das
+Kraftfahrt-Bundesamt: die Kennzeichenliste als Faltblatt sowie die
+Verzeichnisse der Zulassungsbezirke unter kba.de. Format in `districts.ts`:
+`KÜRZEL|Zulassungsbezirk|Bundesland`, eine Zeile je Eintrag. Das Bundesland ist
+kein Beiwerk – daran hängen die Landessperren oben.
 
 ## 5. Zahlungen
 
@@ -316,6 +340,8 @@ src/
     services.ts              Leistungen und Preise
     districts.ts             Unterscheidungszeichen
     plate.ts                 Kennzeichenlogik
+    plate-rules.ts           gesperrte Kombinationen je Bundesland
+    plate-availability.ts    Verfügbarkeitsabfrage (optional)
     order.ts                 Optionen, Validierung, Preisberechnung
     orders-store.ts          Ablage
     order-flow.ts            Ablaufsteuerung des Auftrags

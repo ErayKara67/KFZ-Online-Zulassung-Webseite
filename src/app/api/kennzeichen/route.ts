@@ -21,11 +21,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
   }
 
-  /**
-   * Hier wird im Produktivbetrieb die Schnittstelle der Zulassungsbehörde
-   * bzw. des Reservierungsdienstleisters aufgerufen. Siehe README.
+  /*
+   * Formprüfung immer, Verfügbarkeitsabfrage nur bei konfigurierter
+   * Schnittstelle (PLATE_CHECK_URL). Siehe src/lib/plate-availability.ts.
    */
-  const result = checkPlate(parsed.data);
+  const result = await checkPlate(parsed.data);
 
   return NextResponse.json(result, {
     headers: { "Cache-Control": "no-store" },

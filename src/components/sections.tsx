@@ -137,8 +137,8 @@ export function SofortSection() {
 
 const steps = [
   {
-    title: "Verfügbarkeit prüfen",
-    text: "Ortskürzel, Buchstaben und Zahlen eingeben. Wir gleichen die Kombination mit dem Bestand Ihres Zulassungsbezirks ab.",
+    title: "Kombination prüfen",
+    text: "Ortskürzel, Buchstaben und Zahlen eingeben. Wir prüfen sofort, ob die Kombination zulässig ist, und fragen die Verfügbarkeit bei Ihrer Zulassungsbehörde ab.",
   },
   {
     title: "Auftrag erteilen",

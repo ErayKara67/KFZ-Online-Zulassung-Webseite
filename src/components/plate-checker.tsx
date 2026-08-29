@@ -82,10 +82,11 @@ export function PlateChecker({
       >
         <fieldset>
           <legend className="text-base font-semibold text-ink-900">
-            Wunschkennzeichen auf Verfügbarkeit prüfen
+            Wunschkennzeichen prüfen
           </legend>
           <p className="mt-1 text-sm text-ink-500">
-            Ortskürzel, Buchstaben und Zahlen eingeben – das Ergebnis erscheint sofort.
+            Ortskürzel, Buchstaben und Zahlen eingeben – wir prüfen sofort, ob die
+            Kombination zulässig ist.
           </p>
 
           <div className="mt-5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-3">
@@ -163,7 +164,7 @@ export function PlateChecker({
 
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button type="submit" size="lg" disabled={loading} className="w-full sm:w-auto">
-              {loading ? "Prüfe …" : "Verfügbarkeit prüfen"}
+              {loading ? "Prüfe …" : "Kennzeichen prüfen"}
               {!loading ? <span aria-hidden="true">→</span> : null}
             </Button>
             <p className="text-xs text-ink-500">
@@ -187,7 +188,41 @@ export function PlateChecker({
           </p>
         ) : null}
 
-        {result?.status === "available" ? (
+        {result && result.status !== "ungueltig" && result.hinweise.length > 0 ? (
+          <ul className="mt-5 space-y-2 rounded-lg border border-warn-700/20 bg-warn-100 p-4 text-sm text-warn-700">
+            {result.hinweise.map((h) => (
+              <li key={h}>{h}</li>
+            ))}
+          </ul>
+        ) : null}
+
+        {result?.status === "formal_ok" ? (
+          <div className="mt-5 rounded-lg border border-brand-200 bg-brand-50 p-5">
+            <p className="flex items-start gap-2 text-sm font-semibold text-brand-900">
+              <Check /> {result.message}
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-brand-900">
+              Ob die Kombination noch frei ist, kann nur Ihre Zulassungsbehörde
+              sagen. Wir fragen das für Sie ab und melden uns – die Reservierung
+              erfolgt erst nach Ihrer Bestätigung.
+            </p>
+            {result.zulassungsbezirk ? (
+              <p className="mt-2 text-xs text-brand-900/70">
+                Zuständig: {result.zulassungsbezirk}
+                {result.bundesland ? `, ${result.bundesland}` : ""}
+              </p>
+            ) : null}
+            <Button
+              className="mt-4 w-full sm:w-auto"
+              size="lg"
+              onClick={() => reserve(result.input)}
+            >
+              Kennzeichen anfragen
+            </Button>
+          </div>
+        ) : null}
+
+        {result?.status === "frei" ? (
           <div className="mt-5 rounded-lg border border-ok-700/20 bg-ok-100 p-5">
             <p className="flex items-start gap-2 text-sm font-semibold text-ok-700">
               <Check /> {result.message}
@@ -202,7 +237,7 @@ export function PlateChecker({
           </div>
         ) : null}
 
-        {result?.status === "reserved" ? (
+        {result?.status === "vergeben" ? (
           <div className="mt-5 rounded-lg border border-warn-700/20 bg-warn-100 p-5">
             <p className="text-sm font-semibold text-warn-700">{result.message}</p>
             <ul className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -229,7 +264,7 @@ export function PlateChecker({
           </div>
         ) : null}
 
-        {result?.status === "invalid" ? (
+        {result?.status === "ungueltig" ? (
           <div className="mt-5 rounded-lg border border-bad-700/20 bg-bad-100 p-5">
             <p className="text-sm font-semibold text-bad-700">
               Die Eingabe ist so nicht zulässig
