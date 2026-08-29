@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getOrder, updateOrder } from "@/lib/orders-store";
+import { getOrder, updateOrder, withTimeline } from "@/lib/orders-store";
+import { starteBearbeitung } from "@/lib/order-flow";
 import { baseUrl, getStripe, stripeConfigured } from "@/lib/stripe";
 import { getService } from "@/lib/services";
 
@@ -21,11 +22,17 @@ export async function POST(request: Request) {
 
   const service = getService(order.service);
 
-  /* Demo-Modus ohne Stripe-Schlüssel */
+  /* Demo-Modus ohne Stripe-Schlüssel: Zahlungseingang wird angenommen,
+     damit sich der weitere Ablauf vollständig testen lässt. */
   if (!stripeConfigured) {
-    await updateOrder(order.id, { status: "offen", paymentRef: "demo" });
+    await updateOrder(order.id, {
+      status: "bezahlt",
+      paymentRef: "demo",
+      timeline: withTimeline(order.timeline, "bezahlt", "Demo-Modus ohne Zahlungsdienstleister"),
+    });
+    await starteBearbeitung(order.id);
     return NextResponse.json({
-      url: `${baseUrl()}/bestellung/erfolg?auftrag=${order.id}&demo=1`,
+      url: `${baseUrl()}/bestellung/erfolg?auftrag=${order.id}&code=${order.accessToken}&demo=1`,
       demo: true,
     });
   }
@@ -55,7 +62,7 @@ export async function POST(request: Request) {
           },
         },
       ],
-      success_url: `${baseUrl()}/bestellung/erfolg?auftrag=${order.id}&session={CHECKOUT_SESSION_ID}`,
+      success_url: `${baseUrl()}/bestellung/erfolg?auftrag=${order.id}&code=${order.accessToken}&session={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl()}/bestellung/abbruch?auftrag=${order.id}`,
     });
 

@@ -10,9 +10,9 @@ export const metadata: Metadata = {
 export default async function SuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ auftrag?: string; demo?: string }>;
+  searchParams: Promise<{ auftrag?: string; demo?: string; code?: string }>;
 }) {
-  const { auftrag, demo } = await searchParams;
+  const { auftrag, demo, code } = await searchParams;
 
   return (
     <Container className="max-w-2xl py-20">
@@ -44,6 +44,21 @@ export default async function SuccessPage({
           weil noch kein Zahlungsdienstleister hinterlegt ist. Der Auftrag wurde
           aber vollständig gespeichert und die Benachrichtigungen wurden erzeugt.
         </p>
+      ) : null}
+
+      {auftrag && code ? (
+        <div className="mt-8 rounded-[var(--radius-card)] border border-line bg-surface p-6">
+          <h2 className="text-base font-semibold text-ink-900">Auftrag live verfolgen</h2>
+          <p className="mt-2 text-sm leading-relaxed text-ink-500">
+            Über diesen Link sehen Sie jederzeit den Bearbeitungsstand, erledigen
+            Ihre Identifizierung und laden – bei der Sofortzulassung – den
+            vorläufigen Zulassungsnachweis herunter. Wir haben ihn Ihnen auch per
+            E-Mail geschickt.
+          </p>
+          <ButtonLink href={`/auftrag/${auftrag}?code=${code}`} className="mt-5">
+            Zur Auftragsverfolgung
+          </ButtonLink>
+        </div>
       ) : null}
 
       <ol className="mt-10 space-y-4 border-t border-line pt-8">

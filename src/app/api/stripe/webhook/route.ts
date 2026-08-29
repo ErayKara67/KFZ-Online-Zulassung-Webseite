@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
-import { getOrder, updateOrder } from "@/lib/orders-store";
+import { getOrder, updateOrder, withTimeline } from "@/lib/orders-store";
+import { starteBearbeitung } from "@/lib/order-flow";
 import { notifyAddress, sendMail } from "@/lib/mail";
 import { site } from "@/lib/site";
 
@@ -43,7 +44,12 @@ export async function POST(request: Request) {
     if (orderId) {
       const order = await getOrder(orderId);
       if (order && order.status === "offen") {
-        await updateOrder(orderId, { status: "bezahlt", paymentRef: session.id });
+        await updateOrder(orderId, {
+          status: "bezahlt",
+          paymentRef: session.id,
+          timeline: withTimeline(order.timeline, "bezahlt"),
+        });
+        await starteBearbeitung(orderId);
 
         await sendMail({
           to: order.email,

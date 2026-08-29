@@ -64,6 +64,26 @@ export const extras: Option[] = [
   },
 ];
 
+/**
+ * Sofortzulassung nach i-Kfz Stufe 4.
+ * Enthält zwingend den Express-Vorabversand der Schilder: ohne montierte
+ * Kennzeichen darf trotz vorläufigem Zulassungsnachweis nicht gefahren werden.
+ */
+export const sofortzulassungOption: Option = {
+  id: "sofortzulassung",
+  label: "Sofortzulassung (i-Kfz Stufe 4)",
+  description:
+    "Schilder vorab per Express, digitale Antragstellung, vorläufiger Zulassungsnachweis zum sofortigen Losfahren.",
+  price: 2990,
+};
+
+/** Leistungen, die über i-Kfz Stufe 4 sofort zugelassen werden können. */
+export const sofortFaehigeLeistungen = ["kfz-zulassung", "kfz-ummeldung"] as const;
+
+export function istSofortFaehig(slug: string): boolean {
+  return (sofortFaehigeLeistungen as readonly string[]).includes(slug);
+}
+
 export const shippingOptions: Option[] = [
   {
     id: "standard",
@@ -155,6 +175,29 @@ export const shippingSchema = z.object({
   city: z.string().optional(),
 });
 
+export const ikfzSchema = z.object({
+  sicherheitscodeZb2: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9]{12}$/, "Der Sicherheitscode auf Teil II besteht aus 12 Zeichen"),
+  sicherheitscodeZb1: z.string().trim().toUpperCase().optional(),
+  zb2AusgestelltAm: z
+    .string()
+    .min(1, "Bitte das Ausstellungsdatum der Zulassungsbescheinigung Teil II angeben"),
+  zb1AusgestelltAm: z.string().optional(),
+  identVerfahren: z.enum(["eid", "identanbieter", "elster"], {
+    message: "Bitte ein Identifizierungsverfahren wählen",
+  }),
+  schilderWeg: z.enum(["express", "vorhanden"], {
+    message: "Bitte angeben, woher die Kennzeichenschilder kommen",
+  }),
+  bestaetigung: z.literal(true, {
+    message:
+      "Bitte bestätigen, dass erst nach Montage der Schilder gefahren wird",
+  }),
+});
+
 export const legalSchema = z.object({
   terms: z.literal(true, { message: "Bitte AGB und Widerrufsbelehrung bestätigen" }),
   privacy: z.literal(true, { message: "Bitte Datenschutzhinweise bestätigen" }),
@@ -172,6 +215,7 @@ export interface OptionSelection {
   plateSize?: string;
   extras?: string[];
   shipping?: string;
+  sofortzulassung?: boolean;
 }
 
 export function priceLines(selection: OptionSelection): PriceLine[] {
@@ -189,6 +233,10 @@ export function priceLines(selection: OptionSelection): PriceLine[] {
   for (const id of selection.extras ?? []) {
     const extra = extras.find((e) => e.id === id);
     if (extra) lines.push({ label: extra.label, amount: extra.price });
+  }
+
+  if (selection.sofortzulassung && istSofortFaehig(selection.service)) {
+    lines.push({ label: sofortzulassungOption.label, amount: sofortzulassungOption.price });
   }
 
   const shipping = shippingOptions.find((s) => s.id === selection.shipping);
@@ -219,6 +267,8 @@ export const orderSchema = z.object({
   sepa: sepaSchema.partial().optional(),
   documents: documentsSchema.partial().optional(),
   shipping: shippingSchema.partial().optional(),
+  ikfz: ikfzSchema.partial().optional(),
+  sofortzulassung: z.boolean().default(false),
   extras: z.array(z.string()).default([]),
   plateSize: z.string().default("standard"),
   shippingMethod: z.string().default("standard"),

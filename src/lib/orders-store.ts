@@ -13,7 +13,53 @@ const DATA_DIR = process.env.ORDER_DATA_DIR ?? path.join(process.cwd(), ".data")
 const ORDER_DIR = path.join(DATA_DIR, "orders");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
 
-export type OrderStatus = "offen" | "bezahlt" | "in_bearbeitung" | "abgeschlossen" | "storniert";
+export type OrderStatus =
+  | "offen"
+  | "bezahlt"
+  | "in_bearbeitung"
+  | "abgeschlossen"
+  | "storniert";
+
+/** Schritte der Auftragsverfolgung. Reihenfolge = Anzeigereihenfolge. */
+export type TimelineKey =
+  | "bestellt"
+  | "bezahlt"
+  | "kennzeichen_reserviert"
+  | "schilder_produziert"
+  | "schilder_versandt"
+  | "schilder_zugestellt"
+  | "identifiziert"
+  | "antrag_eingereicht"
+  | "bescheid_erteilt"
+  | "bescheid_abgerufen"
+  | "unterlagen_versandt"
+  | "abgeschlossen";
+
+export interface TimelineEntry {
+  key: TimelineKey;
+  at: string;
+  note?: string;
+}
+
+export interface OrderIkfz {
+  /** Sofortzulassung nach i-Kfz Stufe 4 gebucht */
+  aktiv: boolean;
+  identVerfahren: "eid" | "identanbieter" | "elster";
+  identifiziertAm?: string;
+  antragId?: string;
+  antragStatus?: string;
+  bescheid?: {
+    bescheidId: string;
+    behoerde: string;
+    kennzeichen: string;
+    erlassenAm: string;
+    abrufBis: string;
+    gueltigBis: string;
+    abgerufenAm?: string;
+    simuliert: boolean;
+  };
+  hinweis?: string;
+}
 
 export interface StoredOrder {
   id: string;
@@ -26,11 +72,35 @@ export interface StoredOrder {
   payload: unknown;
   files: { field: string; filename: string; size: number; storedAs: string }[];
   paymentRef?: string;
+  /** Zugriffscode für die Auftragsverfolgung ohne Kundenkonto */
+  accessToken: string;
+  /** Nachweis der erteilten Vollmacht (für die Zulassung auf Dritte) */
+  vollmacht?: {
+    textVersion: string;
+    textHash: string;
+    unterschrift: string;
+    erteiltAm: string;
+    ip?: string;
+    userAgent?: string;
+    qesReferenz?: string;
+  };
+  timeline: TimelineEntry[];
+  ikfz?: OrderIkfz;
 }
 
 async function ensureDirs() {
   await fs.mkdir(ORDER_DIR, { recursive: true });
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
+}
+
+/** Fügt einen Schritt zur Auftragsverfolgung hinzu, sofern er noch fehlt. */
+export function withTimeline(
+  timeline: TimelineEntry[],
+  key: TimelineKey,
+  note?: string,
+): TimelineEntry[] {
+  if (timeline.some((t) => t.key === key)) return timeline;
+  return [...timeline, { key, at: new Date().toISOString(), note }];
 }
 
 export async function saveOrder(order: StoredOrder): Promise<void> {

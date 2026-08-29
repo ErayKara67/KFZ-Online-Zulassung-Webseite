@@ -7,6 +7,7 @@ import {
   ExplainerSection,
   FaqSection,
   ServicesSection,
+  SofortSection,
   StepsSection,
   TrustBar,
   faqItems,
@@ -49,7 +50,7 @@ export default function HomePage() {
           <div className="max-w-2xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink-700">
               <span className="h-2 w-2 rounded-full bg-ok-700" aria-hidden="true" />
-              Prüfung kostenlos · Reservierung erst nach Bestätigung
+              Neu: Sofortzulassung nach i-Kfz Stufe 4 – am selben Tag losfahren
             </p>
 
             <h1 className="mt-6 text-balance text-4xl font-semibold leading-[1.1] tracking-tight text-ink-900 sm:text-5xl">
@@ -67,8 +68,8 @@ export default function HomePage() {
               <ButtonLink href="#pruefer" size="lg">
                 Verfügbarkeit prüfen
               </ButtonLink>
-              <ButtonLink href="/kfz-zulassung" variant="secondary" size="lg">
-                Zulassung beauftragen
+              <ButtonLink href="/sofortzulassung" variant="secondary" size="lg">
+                Sofortzulassung ansehen
               </ButtonLink>
             </div>
 
@@ -96,6 +97,7 @@ export default function HomePage() {
       </div>
 
       <TrustBar />
+      <SofortSection />
       <StepsSection />
       <ServicesSection />
       <ExplainerSection />

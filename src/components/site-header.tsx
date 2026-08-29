@@ -7,12 +7,12 @@ import { site } from "@/lib/site";
 import { Container } from "./ui";
 
 const nav = [
+  { href: "/sofortzulassung", label: "Sofortzulassung" },
   { href: "/wunschkennzeichen", label: "Wunschkennzeichen" },
   { href: "/kfz-zulassung", label: "Zulassung" },
   { href: "/kfz-ummeldung", label: "Ummeldung" },
   { href: "/kfz-abmeldung", label: "Abmeldung" },
   { href: "/umweltplakette", label: "Umweltplakette" },
-  { href: "/zulassungsstellen", label: "Zulassungsstellen" },
 ];
 
 export function SiteHeader() {

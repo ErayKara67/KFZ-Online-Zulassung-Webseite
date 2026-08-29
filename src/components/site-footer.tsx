@@ -73,6 +73,11 @@ export function SiteFooter() {
           </h2>
           <ul className="mt-4 space-y-2.5 text-sm">
             <li>
+              <Link className="text-ink-500 hover:text-brand-800" href="/sofortzulassung">
+                Sofortzulassung (i-Kfz)
+              </Link>
+            </li>
+            <li>
               <Link className="text-ink-500 hover:text-brand-800" href="/zulassungsstellen">
                 Zulassungsstellen A–Z
               </Link>

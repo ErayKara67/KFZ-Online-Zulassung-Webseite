@@ -34,6 +34,8 @@ Serverkonsole, die Zahlung springt direkt auf die Erfolgsseite.
 
 | Bereich | Umsetzung |
 |---|---|
+| **Sofortzulassung (i-Kfz Stufe 4)** | Eigener Bestellweg mit Vorprüfung, Sicherheitscodes, elektronischer Identifizierung, Express-Schilderlogistik, automatisiertem Bescheid und vorläufigem Zulassungsnachweis |
+| **Auftragsverfolgung** | Statusseite mit Zugriffscode, Zeitstrahl, Countdown für Abruffenster und Zehn-Tage-Frist, PDF-Download |
 | Verfügbarkeitsprüfung | Live-Prüfung mit Formatvalidierung nach FZV, Sperrkombinationen, Alternativvorschlägen und Kennzeichen-Vorschau |
 | Leistungen | Wunschkennzeichen, Zulassung, Ummeldung, Abmeldung, Adressänderung, Umweltplakette – je mit eigener Landingpage |
 | Bestellprozess | Mehrstufiger Assistent: Leistung → Fahrzeug → Halter/Versicherung/SEPA → Unterlagen & Vollmacht → Prüfen & zahlen |
@@ -71,6 +73,146 @@ Den Betreiber-Hinweiskasten anschließend abschalten: in den jeweiligen Seiten
 `src/lib/services.ts` – Preise, Leistungsbeschreibungen und Bearbeitungszeiten.
 Die aktuell hinterlegten Werte sind Orientierungswerte und müssen durch Ihre
 eigene Kalkulation ersetzt werden.
+
+---
+
+## 3.5 Sofortzulassung: was fachlich gilt
+
+Die Sofortzulassung beruht auf der internetbasierten Fahrzeugzulassung
+(i-Kfz) nach der Fahrzeug-Zulassungsverordnung. Drei Punkte bestimmen den
+gesamten Ablauf und sind im Code entsprechend abgebildet:
+
+**Ohne montierte Schilder gilt die Fahrberechtigung nicht.** Der vorläufige
+Zulassungsnachweis erlaubt zehn Kalendertage Fahrt, aber nur mit angebrachten
+Kennzeichenschildern – die in dieser Zeit noch ungesiegelt sein dürfen –, dem
+ausgedruckten Nachweis sichtbar im Fahrzeug und dem mitgeführten
+Zulassungsbescheid. Deshalb liefert die Anwendung die Schilder **vor** dem
+Zulassungsantrag und gibt den Antrag erst frei, wenn die Zustellung bestätigt
+ist (`src/lib/order-flow.ts`, `antragEinreichen`).
+
+**Der Bescheid hat ein kurzes Abruffenster.** Er muss innerhalb von 30 Minuten
+abgerufen werden. Die Auftragsverfolgung zeigt den Countdown, die
+Bestätigungsmail enthält den direkten Link.
+
+**Papiere und Plaketten kommen per Post.** Zulassungsbescheinigung und
+Plakettenträger versendet die Behörde. Nach Erhalt sind die Plaketten
+unverzüglich anzubringen; danach ist der vorläufige Nachweis zu vernichten.
+Nach Ablauf der zehn Tage darf ohne Plaketten nicht mehr gefahren werden.
+
+Ausschlussgründe prüft `src/lib/ikfz/eligibility.ts`: Fahrzeugpapiere ohne
+Sicherheitscode (Teil I vor dem 01.01.2015, Teil II vor dem 01.01.2018),
+Sonderkennzeichen wie Kurzzeit-, Ausfuhr- und rote Kennzeichen, fehlende oder
+abgelaufene Hauptuntersuchung, fehlende eVB-Nummer oder fehlendes SEPA-Mandat.
+Die Prüfung läuft im Formular live mit und noch einmal serverseitig.
+
+---
+
+## 3.6 i-Kfz anbinden
+
+Die Anwendung programmiert gegen ein Adapter-Interface (`IkfzProvider` in
+`src/lib/ikfz/types.ts`). Der aktive Adapter wird über `IKFZ_PROVIDER`
+gewählt – Frontend und Bestellprozess bleiben in allen Varianten gleich.
+
+### `sandbox` (Voreinstellung)
+
+Bildet den kompletten fachlichen Ablauf ab, spricht aber mit keiner Behörde.
+Prüfregeln, Abruffenster und Fristen verhalten sich wie im Echtbetrieb. Auf der
+Auftragsverfolgung erscheint eine Sandbox-Steuerung, mit der sich Ereignisse des
+Versanddienstleisters auslösen lassen – gut für Demos und Abnahmen.
+
+Die erzeugten PDF sind **deutlich als Muster gekennzeichnet** und berechtigen
+nicht zur Teilnahme am Straßenverkehr. Im Echtbetrieb werden ausschließlich die
+von der Behörde gelieferten Dokumente durchgereicht; `nachweis-pdf.ts` wird dann
+nicht mehr aufgerufen.
+
+### `gks` – eigene Großkundenschnittstelle
+
+Voraussetzungen laut Kraftfahrt-Bundesamt:
+
+- juristische Person mit **mehr als 500 Zulassungsvorgängen pro Jahr**
+- Registrierung beim KBA, einmalige Gebühr **3.220 €**
+- freigegebene, zertifizierte Software (XFZ-Nachrichten über OSCI-Transport)
+- IT-Sicherheitskonzept nach BSI-Standard, Protokollierung der Zugriffe
+- ELSTER-Unternehmenskonto
+- digital abgebildete Vollmacht der Kundin bzw. des Kunden
+
+Als „Dienstleister“ registrierte Teilnehmer dürfen auf Dritte zulassen –
+das ist die Rolle, die dieses Portal braucht. `src/lib/ikfz/gks-provider.ts`
+enthält das Gerüst mit den Umsetzungsschritten.
+
+### `partner` – über einen bestehenden GKS-Teilnehmer  ← **gewählter Weg**
+
+Der Partner ist bereits GKS-Teilnehmer und tritt mit der Vollmacht Ihrer
+Kundinnen und Kunden gegenüber der Behörde auf. Kein eigenes Mindestvolumen,
+keine KBA-Registrierung, keine zertifizierte Software – dafür Abhängigkeit vom
+Partner und eine Marge je Vorgang.
+
+**Was der Adapter bereits mitbringt** (`src/lib/ikfz/partner-provider.ts`):
+
+- Wiederholung mit wachsender Wartezeit bei Zeitüberschreitung und HTTP 5xx,
+  keine Wiederholung bei fachlicher Ablehnung
+- Idempotenz-Schlüssel je Auftrag – eine Wiederholung erzeugt nie eine zweite
+  Zulassung
+- Fehlertrennung in fachlich, technisch und Konfiguration; die Oberfläche zeigt
+  jede Art unterschiedlich an, ein technischer Ausfall verbrennt den Auftrag nicht
+- Dokumentenabruf über den eigenen Server, damit Partner-URL und Token nie beim
+  Kunden landen
+- asynchroner Rückruf unter `POST /api/ikfz/callback`, HMAC-SHA256-signiert
+  (`IKFZ_PARTNER_WEBHOOK_SECRET`) – für Entscheidungen, die erst später kommen
+- Vollmachtsnachweis mit Textversion, Text-Hash, Unterschrift, Zeitpunkt,
+  IP und User-Agent (`src/lib/ikfz/vollmacht.ts`)
+
+**Was Sie beim Partner anfordern müssen**, bevor es losgeht:
+
+1. Schnittstellenbeschreibung mit vollständiger Feldliste und Testumgebung
+2. Format des Vollmachtsnachweises – manche Partner verlangen eine
+   qualifizierte elektronische Signatur (QES). Dann wird der Signaturdienst im
+   Schritt „Vollmacht“ eingehängt und die Referenz in `qesReferenz` abgelegt.
+3. Welche Vorgänge abgedeckt sind (Neuzulassung, Tageszulassung, Umschreibung,
+   Wiederzulassung, Abmeldung, Adressänderung) und welche Kennzeichenarten
+4. Ob der vorläufige Zulassungsnachweis als PDF geliefert wird und wie lange er
+   abrufbar bleibt
+5. Preis je Vorgang, Abrechnung der amtlichen Gebühren (Durchreichung ohne
+   Aufschlag ist üblich), Mindestumsatz, Kündigungsfrist
+6. Haftung und Verantwortlichkeiten bei fehlerhaften Zulassungen
+7. Auftragsverarbeitungsvertrag nach Art. 28 DSGVO – es fließen Ausweis-,
+   Fahrzeug- und Kontodaten
+
+**Anbindung in vier Schritten:**
+
+```bash
+# 1. Zugangsdaten eintragen
+IKFZ_PROVIDER="partner"
+IKFZ_PARTNER_URL="https://api.ihr-partner.de/v1"
+IKFZ_PARTNER_TOKEN="..."
+IKFZ_PARTNER_WEBHOOK_SECRET="..."
+```
+
+2. Feldnamen in `src/lib/ikfz/partner-mapping.ts` an das Schema des Partners
+   anpassen – **nur diese Datei**, der Rest der Anwendung bleibt unverändert.
+   Dort liegen auch die Statuszuordnungen (`statusZuordnung`).
+3. Rückruf-Endpunkt beim Partner hinterlegen:
+   `https://IHRE-DOMAIN/api/ikfz/callback`
+4. In der Testumgebung des Partners einen kompletten Vorgang durchspielen,
+   danach `IKFZ_PROVIDER` produktiv schalten.
+
+Zum Entwickeln bleibt `sandbox` sinnvoll: gleicher Ablauf, keine Kosten je
+Testvorgang.
+
+**Anbieter am Markt** (Stand der Recherche, bitte selbst aktuell prüfen):
+Kroschke (i-Kfz-Branchenlösung), digital-zulassen.de (B2B mit eingebautem
+Großkundenaccount, Whitelabel und QES), cronn/ZULEX (Software und Anbindung),
+T-KFZ. Wer ohne eigene KBA-Lizenz sofort starten will, braucht einen Anbieter,
+der seinen eigenen Großkundenaccount mitbringt – nicht nur eine Softwarelizenz.
+
+### Identifizierung
+
+Voreingestellt sind drei Wege: Online-Ausweisfunktion (Vertrauensniveau „hoch“),
+Vertrauensdiensteanbieter für Kundinnen und Kunden ohne aktivierte PIN, sowie
+das ELSTER-Unternehmenskonto für Firmen. Die Oberfläche und der Datenfluss sind
+vollständig gebaut; der Redirect zum jeweiligen Anbieter wird in
+`src/app/api/auftrag/[id]/aktion/route.ts` (Aktion `identifizierung`)
+eingehängt.
 
 ---
 
@@ -155,6 +297,8 @@ src/
     page.tsx                 Startseite
     <leistung>/page.tsx      6 Leistungsseiten
     bestellung/              Assistent, Erfolgs- und Abbruchseite
+    sofortzulassung/         Landingpage zu i-Kfz Stufe 4
+    auftrag/[id]/            Auftragsverfolgung mit Zugriffscode
     zulassungsstellen/       Suche über Unterscheidungszeichen
     ratgeber/ kontakt/       Inhalte und Support
     impressum/ datenschutz/ agb/ widerruf/ barrierefreiheit/
@@ -164,6 +308,8 @@ src/
       checkout/              Stripe-Session
       stripe/webhook/        Zahlungsbestätigung
       kontakt/               Kontaktformular
+      auftrag/[id]/          Status, Aktionen, Dokumentenabruf
+      ikfz/callback/         signierter Rückruf des Zulassungspartners
   components/                Header, Footer, Sektionen, Assistent, UI-Bausteine
   lib/
     site.ts                  Stammdaten (Platzhalter)
@@ -172,6 +318,16 @@ src/
     plate.ts                 Kennzeichenlogik
     order.ts                 Optionen, Validierung, Preisberechnung
     orders-store.ts          Ablage
+    order-flow.ts            Ablaufsteuerung des Auftrags
+    order-access.ts          Zugriffscode-Prüfung
+    ikfz/
+      types.ts               Domänenmodell und Provider-Vertrag
+      eligibility.ts         Vorprüfung der Stufe-4-Voraussetzungen
+      partner-provider.ts    aktiver Adapter (GKS-Partner)
+      partner-mapping.ts     Feldzuordnung – hier anpassen
+      sandbox-provider.ts    Testbetrieb ohne Behörde
+      gks-provider.ts        Gerüst für eine eigene GKS
+      vollmacht.ts           versionierter Vollmachtstext und Hash
     mail.ts / stripe.ts      Integrationen
 ```
 

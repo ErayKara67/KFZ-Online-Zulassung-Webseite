@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import { orderSchema, totalCents, type OrderPayload } from "@/lib/order";
 import { getService, formatPrice } from "@/lib/services";
 import { makeOrderId } from "@/lib/order";
-import { saveOrder, storeUpload, type StoredOrder } from "@/lib/orders-store";
+import { saveOrder, storeUpload, withTimeline, type StoredOrder } from "@/lib/orders-store";
+import { istSofortFaehig } from "@/lib/order";
+import { randomBytes } from "node:crypto";
+import { VOLLMACHT_VERSION, vollmachtHash } from "@/lib/ikfz/vollmacht";
 import { notifyAddress, sendMail } from "@/lib/mail";
 import { site } from "@/lib/site";
+import { baseUrl } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
@@ -76,11 +80,14 @@ export async function POST(request: Request) {
     stored.push(await storeUpload(orderId, key.replace(/^datei_/, ""), value));
   }
 
+  const sofort = Boolean(payload.sofortzulassung) && istSofortFaehig(service.slug);
+
   const total = totalCents({
     service: service.slug,
     plateSize: payload.plateSize,
     extras: payload.extras,
     shipping: payload.shippingMethod,
+    sofortzulassung: sofort,
   });
 
   const order: StoredOrder = {
@@ -93,6 +100,31 @@ export async function POST(request: Request) {
     email: payload.holder.email,
     payload: redact(payload),
     files: stored,
+    accessToken: randomBytes(16).toString("hex"),
+    /*
+     * Nachweis der Bevollmächtigung. Für die Zulassung auf Dritte muss
+     * belegbar sein, welcher Fassung wann und von wo zugestimmt wurde.
+     */
+    vollmacht: payload.documents?.signature
+      ? {
+          textVersion: VOLLMACHT_VERSION,
+          textHash: vollmachtHash(),
+          unterschrift: payload.documents.signature,
+          erteiltAm: new Date().toISOString(),
+          ip:
+            request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+            undefined,
+          userAgent: request.headers.get("user-agent") ?? undefined,
+        }
+      : undefined,
+    timeline: withTimeline([], "bestellt"),
+    ikfz: sofort
+      ? {
+          aktiv: true,
+          identVerfahren:
+            (payload.ikfz?.identVerfahren as "eid" | "identanbieter" | "elster") ?? "eid",
+        }
+      : undefined,
   };
 
   await saveOrder(order);
@@ -116,6 +148,7 @@ export async function POST(request: Request) {
       `E-Mail: ${payload.holder.email}`,
       `Telefon: ${payload.holder.phone}`,
       "",
+      `Sofortzulassung (i-Kfz Stufe 4): ${sofort ? "ja" : "nein"}`,
       `Anhänge: ${stored.map((f) => f.filename).join(", ") || "keine"}`,
       "",
       payload.note ? `Nachricht: ${payload.note}` : "",
@@ -134,15 +167,24 @@ export async function POST(request: Request) {
       `Kennzeichen: ${plate}`,
       `Betrag: ${formatPrice(total)}`,
       "",
-      "Nach Zahlungseingang starten wir mit der Bearbeitung. Über jeden",
-      "Bearbeitungsschritt informieren wir Sie per E-Mail.",
+      sofort
+        ? "Sie haben die Sofortzulassung nach i-Kfz Stufe 4 gebucht. Wir liefern zuerst\ndie Kennzeichenschilder per Express. Sobald sie zugestellt sind und Ihre\nIdentifizierung vorliegt, reichen wir den Antrag ein. Den vorläufigen\nZulassungsnachweis erhalten Sie unmittelbar danach zum Ausdrucken."
+        : "Nach Zahlungseingang starten wir mit der Bearbeitung. Über jeden\nBearbeitungsschritt informieren wir Sie per E-Mail.",
+      "",
+      `Auftrag verfolgen: ${baseUrl()}/auftrag/${orderId}?code=${order.accessToken}`,
+      "Bitte bewahren Sie diesen Link auf – er ist Ihr Zugang zum Vorgang.",
       "",
       `Ihr Team von ${site.name}`,
       `${site.contact.phone} · ${site.contact.email}`,
     ].join("\n"),
   });
 
-  return NextResponse.json({ orderId, totalCents: total });
+  return NextResponse.json({
+    orderId,
+    totalCents: total,
+    accessToken: order.accessToken,
+    sofortzulassung: sofort,
+  });
 }
 
 /** IBAN und Ausweisdaten werden nur maskiert gespeichert. */

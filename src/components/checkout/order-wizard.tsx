@@ -7,6 +7,9 @@ import { z } from "zod";
 import { services, getService, formatPrice, type ServiceSlug } from "@/lib/services";
 import {
   documentsSchema,
+  ikfzSchema,
+  istSofortFaehig,
+  sofortzulassungOption,
   extras as extraOptions,
   holderSchema,
   insuranceSchema,
@@ -18,6 +21,8 @@ import {
   vehicleSchema,
 } from "@/lib/order";
 import { districts } from "@/lib/districts";
+import { IkfzStep, type IkfzDraft } from "./ikfz-step";
+import { VOLLMACHT_TEXT, VOLLMACHT_VERSION } from "@/lib/ikfz/vollmacht-text";
 import { Button, Field, inputClass, Check } from "../ui";
 import { LicensePlate } from "../license-plate";
 import { OrderSummary } from "./order-summary";
@@ -62,6 +67,8 @@ type Draft = {
     city: string;
   };
   legal: { terms: boolean; privacy: boolean };
+  sofortzulassung: boolean;
+  ikfz: IkfzDraft;
   note: string;
 };
 
@@ -99,6 +106,16 @@ const emptyDraft: Draft = {
   documents: { powerOfAttorney: false, signature: "" },
   shipping: { method: "standard", differentAddress: false, street: "", zip: "", city: "" },
   legal: { terms: false, privacy: false },
+  sofortzulassung: false,
+  ikfz: {
+    sicherheitscodeZb2: "",
+    sicherheitscodeZb1: "",
+    zb2AusgestelltAm: "",
+    zb1AusgestelltAm: "",
+    identVerfahren: "eid",
+    schilderWeg: "express",
+    bestaetigung: false,
+  },
   note: "",
 };
 
@@ -183,6 +200,8 @@ export function OrderWizard() {
     setDraft({
       ...base,
       service,
+      sofortzulassung:
+        params.get("sofort") === "1" ? true : base.sofortzulassung,
       plate: {
         district: (params.get("bezirk") ?? base.plate.district).toUpperCase(),
         letters: (params.get("buchstaben") ?? base.plate.letters).toUpperCase(),
@@ -204,6 +223,10 @@ export function OrderWizard() {
 
   const service = getService(draft.service)!;
   const sections = service.sections;
+  const sofortMoeglich = istSofortFaehig(draft.service);
+  const sofortAktiv = sofortMoeglich && draft.sofortzulassung;
+  const ikfzVorgang: "neuzulassung" | "umschreibung" =
+    draft.service === "kfz-ummeldung" ? "umschreibung" : "neuzulassung";
 
   const stepList = useMemo(() => {
     const list: { id: string; label: string }[] = [
@@ -211,10 +234,13 @@ export function OrderWizard() {
     ];
     if (sections.includes("vehicle")) list.push({ id: "fahrzeug", label: "Fahrzeug" });
     list.push({ id: "halter", label: "Halter" });
-    if (sections.includes("documents")) list.push({ id: "unterlagen", label: "Unterlagen" });
+    if (sofortAktiv) list.push({ id: "sofort", label: "Sofortzulassung" });
+    if (sections.includes("documents")) {
+      list.push({ id: "unterlagen", label: sofortAktiv ? "Vollmacht" : "Unterlagen" });
+    }
     list.push({ id: "uebersicht", label: "Prüfen & zahlen" });
     return list;
-  }, [sections]);
+  }, [sections, sofortAktiv]);
 
   const current = stepList[Math.min(step, stepList.length - 1)];
 
@@ -226,6 +252,10 @@ export function OrderWizard() {
 
   const requiredUploads = useMemo(() => {
     const list: { id: string; label: string; hint: string }[] = [];
+    // Bei der Sofortzulassung ersetzt die elektronische Identifizierung die
+    // Ausweiskopie, und die Fahrzeugdaten kommen über die Sicherheitscodes
+    // aus dem Register – es sind keine Uploads nötig.
+    if (sofortAktiv) return list;
     if (sections.includes("documents")) {
       list.push({
         id: "ausweis",
@@ -248,7 +278,7 @@ export function OrderWizard() {
       }
     }
     return list;
-  }, [sections, draft.service]);
+  }, [sections, draft.service, sofortAktiv]);
 
   function validateStep(id: string): Errors {
     let out: Errors = {};
@@ -273,6 +303,18 @@ export function OrderWizard() {
       if (sections.includes("sepa")) {
         const rs = sepaSchema.safeParse(draft.sepa);
         if (!rs.success) out = { ...out, ...collect(rs.error, "sepa") };
+      }
+    }
+    if (id === "sofort") {
+      const r = ikfzSchema.safeParse({
+        ...draft.ikfz,
+        sicherheitscodeZb1: draft.ikfz.sicherheitscodeZb1 || undefined,
+        zb1AusgestelltAm: draft.ikfz.zb1AusgestelltAm || undefined,
+      });
+      if (!r.success) out = { ...out, ...collect(r.error, "ikfz") };
+      if (ikfzVorgang === "umschreibung" && !draft.ikfz.sicherheitscodeZb1) {
+        out["ikfz.sicherheitscodeZb1"] =
+          "Bei einer Umschreibung wird auch der Sicherheitscode von Teil I benötigt";
       }
     }
     if (id === "unterlagen") {
@@ -327,6 +369,8 @@ export function OrderWizard() {
           insurance: sections.includes("insurance") ? draft.insurance : undefined,
           sepa: sections.includes("sepa") ? draft.sepa : undefined,
           documents: sections.includes("documents") ? draft.documents : undefined,
+          ikfz: sofortAktiv ? draft.ikfz : undefined,
+          sofortzulassung: sofortAktiv,
           shipping: sections.includes("shipping") ? draft.shipping : undefined,
           extras: draft.extras,
           plateSize: draft.plateSize,
@@ -368,6 +412,7 @@ export function OrderWizard() {
     plateSize: draft.plateSize,
     extras: draft.extras,
     shipping: draft.shipping.method,
+    sofortzulassung: sofortAktiv,
   };
 
   return (
@@ -456,6 +501,50 @@ export function OrderWizard() {
                 ))}
               </div>
             </fieldset>
+
+            {sofortMoeglich ? (
+              <div
+                className={`mb-8 rounded-[var(--radius-card)] border-2 p-6 transition-colors ${
+                  draft.sofortzulassung ? "border-brand-600 bg-brand-50" : "border-line bg-white"
+                }`}
+              >
+                <label htmlFor="sofort-toggle" className="flex cursor-pointer items-start gap-3">
+                  <input
+                    id="sofort-toggle"
+                    type="checkbox"
+                    checked={draft.sofortzulassung}
+                    onChange={(e) => set("sofortzulassung", e.target.checked)}
+                    className="mt-1 h-5 w-5 shrink-0 accent-[var(--color-brand-700)]"
+                  />
+                  <span>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-base font-semibold text-ink-900">
+                        {sofortzulassungOption.label}
+                      </span>
+                      <span className="rounded-full bg-ok-100 px-2.5 py-1 text-xs font-semibold text-ok-700">
+                        Sofort losfahren
+                      </span>
+                      <span className="text-sm font-semibold text-brand-700">
+                        + {formatPrice(sofortzulassungOption.price)}
+                      </span>
+                    </span>
+                    <span className="mt-2 block text-sm leading-relaxed text-ink-500">
+                      Statt auf Papiere zu warten: Wir liefern die Schilder vorab
+                      per Express und reichen den Antrag digital ein. Sie erhalten
+                      den vorläufigen Zulassungsnachweis und dürfen zehn Tage
+                      fahren, während Zulassungsbescheinigung und Plaketten per
+                      Post kommen.
+                    </span>
+                    <span className="mt-3 block text-xs leading-relaxed text-ink-500">
+                      Voraussetzungen: Fahrzeugpapiere mit Sicherheitscode,
+                      gültige Hauptuntersuchung, eVB-Nummer, SEPA-Mandat und eine
+                      elektronische Identifizierung. Wir prüfen das im Verlauf
+                      Schritt für Schritt.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            ) : null}
 
             {sections.includes("plate") ? (
               <>
@@ -979,13 +1068,38 @@ export function OrderWizard() {
           </section>
         ) : null}
 
+        {/* ------------------------------------------- Schritt: Sofortzulassung */}
+        {current.id === "sofort" ? (
+          <IkfzStep
+            value={draft.ikfz}
+            onChange={(änderung) => patch("ikfz", änderung)}
+            errors={errors}
+            vorgang={ikfzVorgang}
+            istFirma={draft.holder.salutation === "firma"}
+            evb={draft.insurance.evb}
+            iban={draft.sepa.iban}
+            huGueltigBis={draft.vehicle.huUntil}
+          />
+        ) : null}
+
         {/* ---------------------------------------------- Schritt: Unterlagen */}
         {current.id === "unterlagen" ? (
           <section>
             <StepHeader
-              title="Unterlagen und Vollmacht"
-              text="Laden Sie die Dokumente als Foto oder PDF hoch. Die Dateien werden verschlüsselt übertragen und nach Abschluss des Vorgangs gelöscht."
+              title={sofortAktiv ? "Vollmacht" : "Unterlagen und Vollmacht"}
+              text={
+                sofortAktiv
+                  ? "Für die Sofortzulassung entfallen die Dokument-Uploads: Ihre Identität wird elektronisch nachgewiesen, die Fahrzeugdaten liest die Behörde über die Sicherheitscodes aus dem Register. Wir brauchen nur noch Ihre Vollmacht."
+                  : "Laden Sie die Dokumente als Foto oder PDF hoch. Die Dateien werden verschlüsselt übertragen und nach Abschluss des Vorgangs gelöscht."
+              }
             />
+
+            {sofortAktiv ? (
+              <p className="mb-6 flex items-start gap-2 rounded-lg bg-ok-100 px-4 py-3 text-sm text-ok-700">
+                <Check className="mt-0.5 h-4 w-4 shrink-0" />
+                Keine Ausweiskopie, kein Scan der Fahrzeugpapiere nötig.
+              </p>
+            ) : null}
 
             <div className="space-y-4">
               {requiredUploads.map((doc) => (
@@ -1020,12 +1134,8 @@ export function OrderWizard() {
 
             <div className="mt-8 rounded-lg border border-line bg-surface p-6">
               <h3 className="text-base font-semibold text-ink-900">Vollmacht</h3>
-              <p className="mt-2 text-sm leading-relaxed text-ink-500">
-                Hiermit bevollmächtige ich den Anbieter, mich gegenüber der
-                zuständigen Zulassungsbehörde in allen Angelegenheiten dieses
-                Vorgangs zu vertreten, Erklärungen abzugeben und entgegenzunehmen
-                sowie Gebühren in meinem Namen zu verauslagen.
-              </p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-500">{VOLLMACHT_TEXT}</p>
+              <p className="mt-2 text-xs text-ink-300">Fassung {VOLLMACHT_VERSION}</p>
 
               <div className="mt-5">
                 <CheckboxRow
@@ -1085,6 +1195,29 @@ export function OrderWizard() {
               <Row label="Kontakt" value={`${draft.holder.email} · ${draft.holder.phone}`} />
               {sections.includes("insurance") ? (
                 <Row label="eVB-Nummer" value={draft.insurance.evb} />
+              ) : null}
+              {sofortAktiv ? (
+                <>
+                  <Row label="Verfahren" value="Sofortzulassung nach i-Kfz Stufe 4" />
+                  <Row
+                    label="Identifizierung"
+                    value={
+                      draft.ikfz.identVerfahren === "eid"
+                        ? "Online-Ausweisfunktion (eID)"
+                        : draft.ikfz.identVerfahren === "elster"
+                          ? "ELSTER-Unternehmenskonto"
+                          : "Vertrauensdiensteanbieter"
+                    }
+                  />
+                  <Row
+                    label="Kennzeichenschilder"
+                    value={
+                      draft.ikfz.schilderWeg === "express"
+                        ? "Express-Vorabversand durch uns"
+                        : "Beim Halter vorhanden"
+                    }
+                  />
+                </>
               ) : null}
               {sections.includes("sepa") ? (
                 <Row

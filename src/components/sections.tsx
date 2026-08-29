@@ -60,6 +60,79 @@ export function TrustBar() {
   );
 }
 
+/* ------------------------------------------------------ Sofortzulassung */
+
+export function SofortSection() {
+  return (
+    <Section tone="white" id="sofortzulassung">
+      <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:items-center">
+        <div>
+          <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-ok-100 px-3 py-1.5 text-xs font-semibold text-ok-700">
+            <span className="h-2 w-2 rounded-full bg-ok-700" aria-hidden="true" />
+            Neu · i-Kfz Stufe 4
+          </p>
+          <H2>Zulassen und am selben Tag losfahren</H2>
+          <Lead>
+            Bei der Sofortzulassung liefern wir die Schilder vorab per Express
+            und reichen den Antrag digital ein. Nach dem automatisierten Bescheid
+            erhalten Sie den vorläufigen Zulassungsnachweis und dürfen zehn Tage
+            fahren – Papiere und Plaketten kommen in dieser Zeit per Post.
+          </Lead>
+
+          <ul className="mt-7 space-y-2.5">
+            {[
+              "Kein Warten auf die Zulassungsbescheinigung",
+              "Keine Ausweiskopie, keine Scans – Identifizierung läuft elektronisch",
+              "Nachweis als PDF, sofort ausdruckbar",
+              "Auftragsverfolgung mit Fristen im Blick",
+            ].map((t) => (
+              <li key={t} className="flex gap-2.5 text-sm text-ink-700">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
+                <span>{t}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <ButtonLink href="/bestellung?leistung=kfz-zulassung&sofort=1" size="lg">
+              Sofortzulassung beauftragen
+            </ButtonLink>
+            <ButtonLink href="/sofortzulassung" variant="secondary" size="lg">
+              Wie es funktioniert
+            </ButtonLink>
+          </div>
+        </div>
+
+        <Card className="bg-surface">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-700">
+            Zeitplan einer Sofortzulassung
+          </h3>
+          <ol className="mt-5 space-y-4">
+            {[
+              ["Tag 0", "Auftrag erteilt, Kennzeichen reserviert, Schilder gehen per Express raus"],
+              ["Tag 1", "Schilder zugestellt, Identifizierung erledigt, Antrag eingereicht"],
+              ["Tag 1", "Bescheid da – Nachweis ausdrucken, Schilder montieren, losfahren"],
+              ["bis Tag 10", "Papiere und Plaketten kommen per Post und werden angebracht"],
+            ].map(([tag, text]) => (
+              <li key={text} className="flex gap-4">
+                <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-brand-700">
+                  {tag}
+                </span>
+                <span className="text-sm leading-relaxed text-ink-700">{text}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-6 border-t border-line pt-5 text-xs leading-relaxed text-ink-500">
+            Voraussetzung sind Fahrzeugpapiere mit Sicherheitscode, eine gültige
+            Hauptuntersuchung, eVB-Nummer, SEPA-Mandat und eine elektronische
+            Identifizierung. Wir prüfen das im Auftrag Schritt für Schritt.
+          </p>
+        </Card>
+      </div>
+    </Section>
+  );
+}
+
 /* --------------------------------------------------------------- Steps */
 
 const steps = [
@@ -349,6 +422,14 @@ export const faqItems = [
   {
     q: "Kann ich mein Fahrzeug wirklich vollständig online zulassen?",
     a: "Ja. Sie erteilen uns eine Vollmacht, laden die erforderlichen Unterlagen hoch und wir übernehmen den Behördengang. Zulassungsbescheinigung und Kennzeichen erhalten Sie anschließend per Post.",
+  },
+  {
+    q: "Kann ich nach der Bestellung wirklich sofort losfahren?",
+    a: "Mit der Sofortzulassung nach i-Kfz Stufe 4 ja – sobald der automatisierte Zulassungsbescheid vorliegt und die Kennzeichenschilder montiert sind. Der vorläufige Zulassungsnachweis gilt zehn Kalendertage; er wird ausgedruckt und sichtbar im Fahrzeug angebracht. Deshalb liefern wir die Schilder vor dem Zulassungsantrag per Express.",
+  },
+  {
+    q: "Was brauche ich für die Sofortzulassung?",
+    a: "Fahrzeugpapiere mit Sicherheitscode (Teil II ab 2018, Teil I ab 2015), eine gültige Hauptuntersuchung, die eVB-Nummer, ein SEPA-Mandat für die Kfz-Steuer und eine elektronische Identifizierung – per Online-Ausweisfunktion, über einen Identifizierungspartner oder bei Firmen über das ELSTER-Unternehmenskonto.",
   },
   {
     q: "Welche Unterlagen brauche ich für eine Zulassung?",
