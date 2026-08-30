@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-900: #0b1220;
+  --color-ink-700: #253247;
+  --color-ink-500: #5a6879;
+  --color-ink-300: #8b97a8;
+
+  --color-brand-950: #06203f;
+  --color-brand-900: #0b2e5b;
+  --color-brand-800: #10406f;
+  --color-brand-700: #14498c;
+  --color-brand-600: #1a5cb0;
+  --color-brand-500: #2f74cc;
+  --color-brand-200: #c6dcf6;
+  --color-brand-100: #e6eefa;
+  --color-brand-50: #f3f7fd;
+
+  --color-surface: #f6f8fb;
+  --color-line: #dde4ee;
+
+  --color-ok-700: #0f6b46;
+  --color-ok-100: #e3f5ec;
+  --color-warn-700: #8a5a00;
+  --color-warn-100: #fdf3dc;
+  --color-bad-700: #a52218;
+  --color-bad-100: #fdeceb;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Arial, sans-serif;
+
+  --radius-card: 14px;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: #ffffff;
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  font-feature-settings: "kern", "liga";
+}
+
+::selection {
+  background: var(--color-brand-200);
+}
+
+/* Sichtbarer Fokus für Tastaturbedienung (Barrierefreiheit) */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-brand-600);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--color-brand-900);
+  color: #fff;
+  padding: 0.75rem 1.25rem;
+}
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+}
+
+/* Amtliche Rasterlinie für Sektionsübergänge */
+.hairline {
+  border-top: 1px solid var(--color-line);
+}
+
+@media print {
+  header nav,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+}
