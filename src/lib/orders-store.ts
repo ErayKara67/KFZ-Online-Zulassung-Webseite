@@ -97,6 +97,15 @@ export interface StoredOrder {
   };
   timeline: TimelineEntry[];
   ikfz?: OrderIkfz;
+  /** Ausgeführte Erstattungen – Nachweis für Buchhaltung und Rückfragen */
+  erstattungen?: {
+    betragCent: number;
+    grund: string;
+    notiz?: string;
+    referenz: string;
+    ausgeloestVon: string;
+    am: string;
+  }[];
 }
 
 async function ensureDirs() {

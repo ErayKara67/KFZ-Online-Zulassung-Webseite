@@ -34,11 +34,28 @@ export const einkaufspreise = {
   expressversand: 0,
   /** PLATZHALTER – amtliche Gebühren, je Bezirk verschieden */
   amtlicheGebuehren: 0,
-  /** Anteil des Zahlungsdienstleisters am Bruttobetrag */
-  zahlungsanteil: 0.019,
-  /** Fixer Anteil des Zahlungsdienstleisters je Transaktion */
-  zahlungFix: 25,
 } as const;
+
+/**
+ * Gebühren des Zahlungsdienstleisters je Zahlungsart.
+ * Sätze laut Stripe-Preisliste Deutschland – bei Vertragsanpassungen prüfen.
+ * PayPal wird gesondert bepreist und ist hier bewusst nicht geschätzt.
+ */
+export const zahlungsgebuehren: Record<
+  string,
+  { label: string; anteil: number; fix: number; bekannt: boolean }
+> = {
+  karte: { label: "Karte (EWR-Standard)", anteil: 0.015, fix: 25, bekannt: true },
+  karte_premium: { label: "Karte (EWR-Premium)", anteil: 0.028, fix: 25, bekannt: true },
+  sepa: { label: "SEPA-Lastschrift", anteil: 0, fix: 35, bekannt: true },
+  klarna: { label: "Klarna", anteil: 0.0299, fix: 35, bekannt: true },
+  paypal: { label: "PayPal", anteil: 0, fix: 0, bekannt: false },
+};
+
+export function zahlungsgebuehr(erloesCent: number, zahlungsart: string): number {
+  const tarif = zahlungsgebuehren[zahlungsart] ?? zahlungsgebuehren.karte;
+  return Math.round(erloesCent * tarif.anteil) + tarif.fix;
+}
 
 export interface KostenEingabe {
   /** Bruttoerlös des Auftrags in Cent */
@@ -48,6 +65,8 @@ export interface KostenEingabe {
   expressversand: boolean;
   /** Tatsächliche amtliche Gebühren, sobald bekannt */
   amtlicheGebuehrenCent?: number;
+  /** Gewählte Zahlungsart – bestimmt die Gebühr des Zahlungsdienstleisters */
+  zahlungsart?: string;
 }
 
 export interface Deckungsbeitrag {
@@ -98,10 +117,15 @@ export function berechneDeckungsbeitrag(eingabe: KostenEingabe): Deckungsbeitrag
     nimm("versand", "Expressversand", einkaufspreise.expressversand, "schaetzung");
   }
 
-  const zahlung =
-    Math.round(eingabe.erloesCent * einkaufspreise.zahlungsanteil) +
-    einkaufspreise.zahlungFix;
-  nimm("zahlung", "Zahlungsgebühren", zahlung, "schaetzung");
+  const zahlungsart = eingabe.zahlungsart ?? "karte";
+  const tarif = zahlungsgebuehren[zahlungsart] ?? zahlungsgebuehren.karte;
+  nimm(
+    "zahlung",
+    `Zahlungsgebühren – ${tarif.label}`,
+    zahlungsgebuehr(eingabe.erloesCent, zahlungsart),
+    tarif.bekannt ? "vertrag" : "schaetzung",
+    tarif.bekannt ? undefined : "Satz beim Anbieter erfragen",
+  );
 
   const kostenCent = positionen.reduce((s, p) => s + p.betrag, 0);
   const deckungsbeitragCent = eingabe.erloesCent - kostenCent;

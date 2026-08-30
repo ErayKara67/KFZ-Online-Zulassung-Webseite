@@ -347,6 +347,59 @@ Zahlungsbestätigung.
 
 ---
 
+## 5.5 Storno und Erstattung
+
+Die AGB sagen zu, nicht angefallene Leistungen zu erstatten. Was „nicht
+angefallen" heißt, hängt vom Fortschritt ab – und daran hängt Geld, das
+teilweise schon bei Behörde und Prägepartner liegt. `src/lib/refunds.ts`
+rechnet deshalb einen **Vorschlag**, den ein Mensch bestätigt oder überstimmt:
+
+| Stand des Vorgangs | Vorschlag |
+|---|---|
+| Bezahlt, Bearbeitung nicht begonnen | voller Betrag |
+| Schilder geprägt | abzüglich Schilder – nach Kundenvorgabe angefertigt, kein Widerrufsrecht (§ 312g Abs. 2 Nr. 1 BGB) |
+| Schilder versandt | zusätzlich abzüglich Versand |
+| Antrag eingereicht | zusätzlich abzüglich verauslagter Gebühren und Bearbeitung |
+| Bescheid erteilt | Leistung erbracht – Erstattung ist Kulanzentscheidung, wird zur Prüfung markiert |
+| Fehler im eigenen Haus | immer voller Betrag ohne Abzug |
+
+Solange Schilder-, Versand- und Gebührenpreise in `costs.ts` bei null stehen,
+setzt der Vorschlag dafür nichts ab und markiert den Fall mit
+`pruefenLassen: true`. Lieber zu viel erstattet als eine erfundene Kürzung.
+
+**Bedienung.** Erst den Vorschlag ansehen:
+
+```bash
+curl -H "Authorization: Bearer $ADMIN_API_TOKEN" \
+  "https://IHRE-DOMAIN/api/admin/erstattung?auftrag=KP-2026…&grund=kundenwunsch"
+```
+
+Dann ausführen – mit `betragCent` lässt sich der Vorschlag bewusst überstimmen:
+
+```bash
+curl -X POST -H "Authorization: Bearer $ADMIN_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"auftrag":"KP-2026…","grund":"nicht_durchfuehrbar","notiz":"eVB abgelaufen"}' \
+  https://IHRE-DOMAIN/api/admin/erstattung
+```
+
+Gründe: `kundenwunsch`, `widerruf`, `nicht_durchfuehrbar`,
+`unterlagen_unvollstaendig`, `behoerde_abgelehnt`, `fehler_intern`.
+
+Jede Erstattung wird am Auftrag vermerkt (Betrag, Grund, Notiz, Referenz des
+Zahlungsdienstleisters, Zeitpunkt), Kundin bzw. Kunde und Team werden per
+E-Mail informiert. Die Stripe-Rückzahlung läuft mit Idempotenz-Schlüssel, ein
+Wiederholungsversuch zahlt also nicht doppelt aus, und mehr als gezahlt lässt
+sich nicht erstatten.
+
+> **Grenze der jetzigen Lösung:** Der Endpunkt ist mit einem gemeinsamen Token
+> abgesichert. Für den Anfang mit wenigen Personen reicht das, es ersetzt aber
+> kein Sachbearbeiter-Backend mit persönlichen Konten, Rollen, Zwei-Faktor und
+> revisionssicherem Protokoll. Token wie ein Passwort behandeln und bei
+> Personalwechsel tauschen.
+
+---
+
 ## 6. Datenhaltung
 
 Aufträge liegen als JSON unter `.data/orders`, Uploads unter `.data/uploads`.
