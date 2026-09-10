@@ -64,6 +64,12 @@ export interface OrderIkfz {
 
 export interface StoredOrder {
   id: string;
+  /** Autohaus, über das der Vorgang hereinkam – leer bei Direktkunden */
+  dealerId?: string;
+  /** Kurzreferenz des Verkaufs, etwa Kommissionsnummer */
+  dealerReferenz?: string;
+  /** Vom Verkauf angelegt, Kundendaten noch offen */
+  vomHaendlerAngelegt?: boolean;
   status: OrderStatus;
   createdAt: string;
   updatedAt: string;
@@ -130,6 +136,34 @@ export async function saveOrder(order: StoredOrder): Promise<void> {
     JSON.stringify(order, null, 2),
     "utf8",
   );
+}
+
+/**
+ * Alle Aufträge eines Autohauses, neueste zuerst.
+ *
+ * Liest das Verzeichnis durch – für den Anfang völlig ausreichend. Mit einer
+ * Datenbank wird daraus eine Abfrage mit Index auf dealerId.
+ */
+export async function listOrdersByDealer(dealerId: string): Promise<StoredOrder[]> {
+  try {
+    const dateien = await fs.readdir(ORDER_DIR);
+    const auftraege: StoredOrder[] = [];
+
+    for (const datei of dateien) {
+      if (!datei.endsWith(".json")) continue;
+      try {
+        const roh = await fs.readFile(path.join(ORDER_DIR, datei), "utf8");
+        const order = JSON.parse(roh) as StoredOrder;
+        if (order.dealerId === dealerId) auftraege.push(order);
+      } catch {
+        /* beschädigte Datei überspringen */
+      }
+    }
+
+    return auftraege.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  } catch {
+    return [];
+  }
 }
 
 export async function getOrder(id: string): Promise<StoredOrder | null> {

@@ -359,6 +359,13 @@ export function OrderWizard() {
 
     try {
       const form = new FormData();
+      /* Vom Autohaus vorbereiteter Vorgang – wird fortgeschrieben */
+      const vorbereitet = params.get("auftrag");
+      const vorbereiteterCode = params.get("code");
+      if (vorbereitet && vorbereiteterCode) {
+        form.append("auftrag", vorbereitet);
+        form.append("code", vorbereiteterCode);
+      }
       form.append(
         "payload",
         JSON.stringify({

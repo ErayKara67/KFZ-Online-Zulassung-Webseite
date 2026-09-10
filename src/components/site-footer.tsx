@@ -94,6 +94,11 @@ export function SiteFooter() {
                 Kontakt
               </Link>
             </li>
+            <li>
+              <Link className="text-ink-2 hover:text-accent-bright" href="/fuer-autohaeuser">
+                Für Autohäuser
+              </Link>
+            </li>
             {recht.map((l) => (
               <li key={l.href}>
                 <Link className="text-ink-2 hover:text-accent-bright" href={l.href}>

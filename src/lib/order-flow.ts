@@ -5,6 +5,8 @@ import { getSignatureProvider } from "./signature";
 import { getOrder, updateOrder, withTimeline, type StoredOrder } from "./orders-store";
 import { notifyAddress, sendMail } from "./mail";
 import { site } from "./site";
+import { findeDealer } from "./dealers";
+import { kennzeichenVon, kundeVon } from "./order-status";
 import { baseUrl } from "./stripe";
 
 /**
@@ -379,6 +381,34 @@ export async function uebernehmeAntwort(
         `Ihr Team von ${site.name}`,
       ].join("\n"),
     });
+  }
+
+  /*
+   * Das Autohaus erfährt es zuerst — es muss die Übergabe planen und will
+   * nicht beim Kunden nachfragen müssen, ob der Wagen schon zugelassen ist.
+   */
+  if (!bescheidWarSchonDa && antwort.status === "bewilligt" && order.dealerId) {
+    const dealer = findeDealer(order.dealerId);
+    if (dealer) {
+      await sendMail({
+        to: dealer.email,
+        subject: `Fahrbereit: ${kennzeichenVon(order)} — ${kundeVon(order)}`,
+        text: [
+          `Der Vorgang ${order.id} ist zugelassen.`,
+          "",
+          `Kundin bzw. Kunde: ${kundeVon(order)}`,
+          `Kennzeichen: ${kennzeichenVon(order)}`,
+          order.dealerReferenz ? `Ihre Referenz: ${order.dealerReferenz}` : "",
+          "",
+          "Das Fahrzeug kann übergeben werden. Der vorläufige",
+          "Zulassungsnachweis liegt bei der Kundin bzw. dem Kunden im Konto.",
+          "",
+          `Übersicht: ${baseUrl()}/haendler/uebersicht`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      });
+    }
   }
 
   return aktualisiert;

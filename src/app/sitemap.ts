@@ -7,6 +7,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "",
     "/zulassungsstellen",
     "/ratgeber",
+    "/fuer-autohaeuser",
     "/kontakt",
     "/impressum",
     "/datenschutz",

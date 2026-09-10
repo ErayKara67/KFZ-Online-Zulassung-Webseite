@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { orderSchema, totalCents, type OrderPayload } from "@/lib/order";
 import { getService, formatPrice } from "@/lib/services";
 import { makeOrderId } from "@/lib/order";
-import { saveOrder, storeUpload, withTimeline, type StoredOrder } from "@/lib/orders-store";
+import {
+  getOrder,
+  saveOrder,
+  storeUpload,
+  withTimeline,
+  type StoredOrder,
+} from "@/lib/orders-store";
+import { codeStimmt } from "@/lib/order-access";
 import { istSofortFaehig } from "@/lib/order";
 import { randomBytes } from "node:crypto";
 import { VOLLMACHT_VERSION, vollmachtHash } from "@/lib/ikfz/vollmacht";
@@ -59,7 +66,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unbekannte Leistung." }, { status: 400 });
   }
 
-  const orderId = makeOrderId();
+  /*
+   * Vom Autohaus vorbereitete Vorgänge werden fortgeschrieben, nicht doppelt
+   * angelegt: Auftragsnummer, Zugriffscode und Händlerzuordnung bleiben.
+   */
+  const bestehendeId = form.get("auftrag");
+  const bestehenderCode = form.get("code");
+  let vorbereitet: StoredOrder | null = null;
+
+  if (typeof bestehendeId === "string" && typeof bestehenderCode === "string") {
+    const kandidat = await getOrder(bestehendeId);
+    if (kandidat && codeStimmt(kandidat.accessToken, bestehenderCode)) {
+      vorbereitet = kandidat;
+    }
+  }
+
+  const orderId = vorbereitet?.id ?? makeOrderId();
 
   /* Dateien prüfen und ablegen */
   const stored: StoredOrder["files"] = [];
@@ -101,7 +123,10 @@ export async function POST(request: Request) {
     email: payload.holder.email,
     payload: redact(payload),
     files: stored,
-    accessToken: randomBytes(16).toString("hex"),
+    accessToken: vorbereitet?.accessToken ?? randomBytes(16).toString("hex"),
+    dealerId: vorbereitet?.dealerId,
+    dealerReferenz: vorbereitet?.dealerReferenz,
+    vomHaendlerAngelegt: false,
     /*
      * Nachweis der Bevollmächtigung. Für die Zulassung auf Dritte muss
      * belegbar sein, welcher Fassung wann und von wo zugestimmt wurde.
@@ -118,7 +143,7 @@ export async function POST(request: Request) {
           userAgent: request.headers.get("user-agent") ?? undefined,
         }
       : undefined,
-    timeline: withTimeline([], "bestellt"),
+    timeline: withTimeline(vorbereitet?.timeline ?? [], "bestellt"),
     ikfz: sofort
       ? {
           aktiv: true,
