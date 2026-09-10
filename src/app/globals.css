@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+/**
+ * Gestaltung: Ausstellungsraum bei Nacht.
+ *
+ * Dunkler Anthrazit-Grund mit kühlem Blaustich wie Fahrzeuglack, darauf warme
+ * Kupfertöne aus der Instrumentenbeleuchtung. Bewusst einfarbig gehalten –
+ * die Seite bringt ihre eigene Lichtstimmung mit, statt sich dem
+ * Systemschema anzupassen.
+ */
+
+@theme {
+  /* Grundflächen, von tief nach hoch */
+  --color-ground:    #0d1014;
+  --color-sunk:      #090c0f;
+  --color-card:      #151a21;
+  --color-raised:    #1c222c;
+  --color-line:      #29313d;
+  --color-line-lit:  #3b4553;
+
+  /* Schrift */
+  --color-ink:       #f1f4f8;
+  --color-ink-2:     #a9b4c2;
+  --color-ink-3:     #75818f;
+  --color-ink-4:     #56606d;
+
+  /* Marke – wird zur Laufzeit aus brand.ts überschrieben */
+  --color-accent:        #d2703a;
+  --color-accent-bright: #ef9257;
+  --color-accent-deep:   #a8542a;
+  --color-accent-veil:   #2a1a12;
+  /* Schrift auf Akzentflächen – dunkel, weil Kupfer zu hell für Weiß ist */
+  --color-on-accent:     #16100b;
+
+  /* Zustände */
+  --color-ok:        #4cb782;
+  --color-ok-veil:   #10241c;
+  --color-warn:      #e3ac42;
+  --color-warn-veil: #2a2314;
+  --color-risk:      #e2564a;
+  --color-risk-veil: #2a1614;
+
+  /* Kennzeichen – amtliche Farben, unabhängig von der Marke */
+  --color-plate-blue: #0b3a9c;
+  --color-plate-gold: #ffcc00;
+
+  --font-sans: var(--font-display), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, monospace;
+
+  --radius-card: 12px;
+  --radius-sm: 8px;
+}
+
+:root {
+  color-scheme: dark;
+
+  /**
+   * Schrift: Systemstapel, damit die Seite ohne externen Request auskommt
+   * und der Datenschutz-Abschnitt kein Google-Fonts-Thema bekommt.
+   *
+   * Für eine eigene Displayschrift auf Vercel in src/app/layout.tsx:
+   *   import { Archivo } from "next/font/google";
+   *   const display = Archivo({ subsets: ["latin"], variable: "--font-display",
+   *     weight: ["500","600","700","800"], display: "swap" });
+   * und display.variable an die className des <html>-Elements hängen.
+   */
+  --font-display: "";
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "kern", "liga";
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+/* Sichtbarer Fokus für Tastaturbedienung */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent-bright);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--color-accent);
+  color: #fff;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0 0 6px 0;
+}
+.skip-link:focus {
+  left: 0;
+  top: 0;
+}
+
+/* Zahlen in Tabellen und Preisen laufen sauber untereinander */
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Feiner Lichtverlauf für Abschnittsköpfe */
+.glow-top {
+  background-image:
+    radial-gradient(60rem 26rem at 18% -12%, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 70%),
+    radial-gradient(48rem 24rem at 92% -20%, color-mix(in srgb, #3f7fd4 12%, transparent), transparent 70%);
+}
+
+/* Diagonale Schraffur wie auf Werkstattböden – sehr zurückhaltend */
+.hatch {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--color-ink) 4%, transparent) 0 1px,
+    transparent 1px 9px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+@media print {
+  header nav, footer, .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+}
