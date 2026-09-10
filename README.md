@@ -35,6 +35,7 @@ Serverkonsole, die Zahlung springt direkt auf die Erfolgsseite.
 | Bereich | Umsetzung |
 |---|---|
 | **Sofortzulassung (i-Kfz Stufe 4)** | Eigener Bestellweg mit Vorprüfung, Sicherheitscodes, elektronischer Identifizierung, Express-Schilderlogistik, automatisiertem Bescheid und vorläufigem Zulassungsnachweis |
+| **Händlerzugang** | Eigener Bereich für Autohäuser: Vorgang in unter einer Minute anlegen, Kunde füllt selbst aus, Übersicht aller Fahrzeuge mit Status und Zuständigkeit, E-Mail sobald ein Fahrzeug fahrbereit ist |
 | **Auftragsverfolgung** | Statusseite mit Zugriffscode, Zeitstrahl, Countdown für Abruffenster und Zehn-Tage-Frist, PDF-Download |
 | Kennzeichenprüfung | Ortssuche nach Name oder Kürzel, Formatvalidierung nach FZV, bundesland-abhängige Sperren, maßstäbliche Vorschau, Merkliste; Verfügbarkeit nur mit angebundener Schnittstelle (siehe Abschnitt 4) |
 | Vorschlagsgenerator | Baut aus Initialen und einer Zahl zulässige Kombinationen und prüft sie in einem Zug |
@@ -481,6 +482,56 @@ src/
       vollmacht.ts           versionierter Vollmachtstext und Hash
     mail.ts / stripe.ts      Integrationen
 ```
+
+---
+
+## 8.5 Händlerzugang
+
+Für Autohäuser gibt es einen eigenen Bereich unter `/haendler`, getrennt von
+der Kundenansicht.
+
+**Vorgang anlegen (`/haendler/neu`).** Der Verkauf gibt Vorname, Nachname und
+E-Mail ein, wählt die Leistung und ob die Sofortzulassung dazugehört.
+Optional Fahrzeug und eigene Referenznummer. Die Kundin bzw. der Kunde bekommt
+automatisch eine E-Mail mit einem Link und trägt Halterdaten, Fahrzeugpapiere,
+Versicherung und Bankverbindung selbst ein. Diese Daten laufen nie über den
+Verkaufstisch.
+
+**Übersicht (`/haendler/uebersicht`).** Alle Vorgänge des Hauses mit Kunde,
+Fahrzeug, Kennzeichen, Leistung, Status und — das ist der eigentliche Nutzen —
+**wer gerade am Zug ist**: Kundin/Kunde, wir oder die Behörde. Oben stehen vier
+Kennzahlen, darunter fällt besonders auf, wie viele Fahrzeuge übergeben werden
+können.
+
+**Benachrichtigung.** Sobald die Zulassung erteilt ist, geht eine E-Mail an das
+Autohaus — mit Kennzeichen, Kundenname und der eigenen Referenz. Das Haus
+erfährt es damit, ohne beim Kunden nachfragen zu müssen.
+
+**Fortschreibung statt Doppelanlage.** Öffnet die Kundin bzw. der Kunde den
+Link, schreibt der Bestellprozess den vorbereiteten Vorgang fort:
+Auftragsnummer, Zugriffscode und Händlerzuordnung bleiben erhalten. Es entsteht
+kein zweiter Auftrag.
+
+### Zugänge einrichten
+
+Über die Umgebungsvariable `DEALERS` als JSON-Liste:
+
+```bash
+DEALERS='[{"id":"nordstern","name":"Autohaus Nordstern","monogram":"AN",
+           "email":"verkauf@example.de","code":"…"}]'
+```
+
+Einen Code erzeugen: `openssl rand -base64 18`. Ohne gesetzte Variable ist ein
+**Demozugang mit dem Code `demo`** aktiv — praktisch für Vorführungen, vor dem
+Livegang aber zwingend zu ersetzen.
+
+> **Grenze der jetzigen Lösung.** Alle im Autohaus teilen sich einen
+> Zugangscode. Es gibt keine persönlichen Konten, keine Rollen, keine
+> Zwei-Faktor-Anmeldung und kein Protokoll darüber, wer was angelegt hat. Für
+> einen Betrieb mit wenigen Personen reicht das; bei mehreren Standorten oder
+> Revisionsanforderungen sind echte Benutzerkonten der nächste Baustein. Die
+> Seite `/fuer-autohaeuser` benennt das offen — im Verkaufsgespräch ist das
+> glaubwürdiger, als es zu verschweigen.
 
 ---
 
