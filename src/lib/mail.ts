@@ -34,7 +34,8 @@ export interface MailInput {
   text: string;
   html?: string;
   replyTo?: string;
-  attachments?: { filename: string; path: string }[];
+  /** Anhänge werden direkt aus dem Speicher verschickt, nicht von der Platte */
+  attachments?: { filename: string; content: Buffer; contentType?: string }[];
 }
 
 export async function sendMail(input: MailInput): Promise<void> {

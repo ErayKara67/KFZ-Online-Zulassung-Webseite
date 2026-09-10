@@ -405,21 +405,62 @@ sich nicht erstatten.
 
 ---
 
-## 6. Datenhaltung
+## 6. Ablage
 
-Aufträge liegen als JSON unter `.data/orders`, Uploads unter `.data/uploads`.
-Das ist bewusst simpel gehalten, damit die Anwendung ohne Datenbank läuft.
+Jeder Schreibzugriff läuft über `src/lib/storage.ts`. Dahinter stecken drei
+Umsetzungen, die Anwendung selbst kennt den Unterschied nicht:
 
-**Für den Produktivbetrieb ersetzen** – insbesondere auf serverlosen Hostern
-(Vercel), wo das Dateisystem nicht dauerhaft ist. Zu tauschen sind nur die
-Funktionen in `src/lib/orders-store.ts`:
+| Ablage | Wann aktiv | Dauerhaft |
+| --- | --- | --- |
+| **Redis** (Vercel KV / Upstash) | sobald `KV_REST_API_URL` und `KV_REST_API_TOKEN` gesetzt sind | ja |
+| **Dateisystem** (`.data/`) | lokal und auf eigenen Servern | ja |
+| **Arbeitsspeicher** | Notnagel: auf Vercel ohne Datenbank | **nein** |
 
-- `saveOrder`, `getOrder`, `updateOrder` → Datenbank (z. B. PostgreSQL/Prisma)
-- `storeUpload` → Objektspeicher (z. B. S3-kompatibel)
+### Warum das wichtig ist
 
-Die IBAN wird bereits maskiert gespeichert. Ausweis- und Fahrzeugdokumente
-sollten nach Abschluss des Vorgangs automatisiert gelöscht werden – die Frist
-steht in der Datenschutzerklärung und muss eingehalten werden.
+Auf Vercel ist das Dateisystem schreibgeschützt. Der frühere Stand hat dort
+beim Anlegen eines Vorgangs versucht, eine Datei zu schreiben; die Anfrage brach
+ab, und im Browser kam eine leere Antwort an – sichtbar als
+
+```
+JSON.parse: unexpected end of data at line 1 column 1 of the JSON data
+```
+
+Das betraf **jeden** Schreibweg: Kundenbestellungen, Händlervorgänge und die
+i-Kfz-Ablage. Behoben ist es an zwei Stellen: die Ablage weicht aus, statt
+abzubrechen, und die Oberfläche zeigt bei einem Serverfehler einen lesbaren
+Satz statt einer Parser-Meldung (`src/lib/antwort.ts`).
+
+### Datenbank verbinden (Vercel, fünf Minuten)
+
+1. Vercel-Dashboard → Projekt → **Storage** → **Create Database**
+2. **Upstash Redis** wählen, Region Frankfurt, anlegen
+3. **Connect to Project** → das Projekt auswählen
+4. Vercel trägt `KV_REST_API_URL` und `KV_REST_API_TOKEN` selbst ein
+5. **Deployments** → letzten Eintrag → **Redeploy** (Variablen greifen erst
+   beim nächsten Deploy)
+
+Danach verschwindet der gelbe Hinweis im Händlerbereich. Solange er steht,
+funktioniert alles – aber angelegte Vorgänge überleben keinen Neustart. Für
+eine Vorführung reicht das, für den Echtbetrieb nicht.
+
+### Uploads
+
+Hochgeladene Dokumente werden **gar nicht** abgelegt. Sie gehen als E-Mail-
+Anhang an die Sachbearbeitung und sind danach nicht mehr im System. Das ist
+Absicht: Ausweis- und Fahrzeugpapiere sind das Heikelste am ganzen Vorgang, und
+was nicht liegt, kann nicht abfließen. Wer sie dauerhaft braucht, bindet in
+`readUpload` (`src/lib/orders-store.ts`) einen Objektspeicher an und trägt die
+Aufbewahrungsfrist in die Datenschutzerklärung ein.
+
+Die IBAN wird nur maskiert gespeichert.
+
+### Später auf eine richtige Datenbank wechseln
+
+Redis trägt den Anfang zuverlässig. Sobald ausgewertet werden soll –
+Umsatz je Autohaus, Durchlaufzeiten, Monatsabschluss – lohnt PostgreSQL. Zu
+schreiben ist dann eine vierte Umsetzung des `Speicher`-Interface in
+`storage.ts`; an den Auftragsfunktionen selbst ändert sich nichts.
 
 ---
 

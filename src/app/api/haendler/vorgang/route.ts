@@ -89,7 +89,19 @@ export async function POST(request: Request) {
     ikfz: sofort ? { aktiv: true, identVerfahren: "eid" } : undefined,
   };
 
-  await saveOrder(order);
+  try {
+    await saveOrder(order);
+  } catch (fehler) {
+    console.error("[haendler:vorgang] Ablage nicht erreichbar", fehler);
+    return NextResponse.json(
+      {
+        error:
+          "Der Vorgang konnte nicht gespeichert werden. Bitte prüfen Sie die " +
+          "Datenbankanbindung (siehe README, Abschnitt „Ablage“).",
+      },
+      { status: 503 },
+    );
+  }
 
   const params = new URLSearchParams({
     leistung: service.slug,

@@ -5,8 +5,9 @@ import { makeOrderId } from "@/lib/order";
 import {
   getOrder,
   saveOrder,
-  storeUpload,
+  readUpload,
   withTimeline,
+  type HochgeladeneDatei,
   type StoredOrder,
 } from "@/lib/orders-store";
 import { codeStimmt } from "@/lib/order-access";
@@ -83,8 +84,8 @@ export async function POST(request: Request) {
 
   const orderId = vorbereitet?.id ?? makeOrderId();
 
-  /* Dateien prüfen und ablegen */
-  const stored: StoredOrder["files"] = [];
+  /* Dateien prüfen und entgegennehmen – abgelegt wird nichts */
+  const dateien: HochgeladeneDatei[] = [];
   for (const [key, value] of form.entries()) {
     if (!key.startsWith("datei_") || !(value instanceof File)) continue;
     if (value.size === 0) continue;
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
         { status: 415 },
       );
     }
-    stored.push(await storeUpload(orderId, key.replace(/^datei_/, ""), value));
+    dateien.push(await readUpload(key.replace(/^datei_/, ""), value));
   }
 
   const sofort = Boolean(payload.sofortzulassung) && istSofortFaehig(service.slug);
@@ -122,7 +123,7 @@ export async function POST(request: Request) {
     service: service.slug,
     email: payload.holder.email,
     payload: redact(payload),
-    files: stored,
+    files: dateien.map(({ field, filename, size }) => ({ field, filename, size })),
     accessToken: vorbereitet?.accessToken ?? randomBytes(16).toString("hex"),
     dealerId: vorbereitet?.dealerId,
     dealerReferenz: vorbereitet?.dealerReferenz,
@@ -185,11 +186,15 @@ export async function POST(request: Request) {
           expressversand: sofort || payload.shippingMethod === "express",
         }),
       ),
-      `Anhänge: ${stored.map((f) => f.filename).join(", ") || "keine"}`,
+      `Anhänge: ${dateien.map((f) => f.filename).join(", ") || "keine"}`,
       "",
       payload.note ? `Nachricht: ${payload.note}` : "",
     ].join("\n"),
-    attachments: stored.map((f) => ({ filename: f.filename, path: f.storedAs })),
+    attachments: dateien.map((f) => ({
+      filename: f.filename,
+      content: f.inhalt,
+      contentType: f.contentType,
+    })),
   });
 
   await sendMail({

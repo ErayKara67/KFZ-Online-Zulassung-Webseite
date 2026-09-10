@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button, Field, inputClass } from "./ui";
+import { leseJson } from "@/lib/antwort";
 
 export function ContactForm() {
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
@@ -28,8 +29,8 @@ export function ContactForm() {
           website: String(data.get("website") ?? ""),
         }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? "Senden fehlgeschlagen.");
+      const { ok, fehler: meldung } = await leseJson<unknown>(res);
+      if (!ok) throw new Error(meldung ?? "Senden fehlgeschlagen.");
       setState("sent");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Senden fehlgeschlagen.");

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { Badge, ButtonLink, Container, Stat } from "@/components/ui";
 import { Abmelden } from "@/components/haendler/abmelden";
+import { AblageHinweis } from "@/components/haendler/ablage-hinweis";
 import { dealerAusSitzung, SITZUNGSCOOKIE } from "@/lib/dealers";
 import { listOrdersByDealer } from "@/lib/orders-store";
 import {
@@ -53,6 +54,7 @@ export default async function Page() {
 
   return (
     <Container className="py-12">
+      <AblageHinweis />
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div>
           <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-accent-bright">

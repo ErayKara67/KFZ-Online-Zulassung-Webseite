@@ -5,6 +5,7 @@ import Link from "next/link";
 import { services, formatPrice } from "@/lib/services";
 import { istSofortFaehig, sofortzulassungOption } from "@/lib/order";
 import { Button, Field, inputClass } from "../ui";
+import { leseJson } from "@/lib/antwort";
 
 /**
  * Schnellerfassung für den Verkauf.
@@ -46,9 +47,12 @@ export function VorgangAnlegen() {
           fahrzeug: fahrzeug || undefined,
         }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? "Anlegen fehlgeschlagen.");
-      setFertig({ orderId: json.orderId, kundenlink: json.kundenlink });
+      const { ok, daten, fehler: meldung } = await leseJson<{
+        orderId: string;
+        kundenlink: string;
+      }>(res);
+      if (!ok || !daten) throw new Error(meldung ?? "Anlegen fehlgeschlagen.");
+      setFertig({ orderId: daten.orderId, kundenlink: daten.kundenlink });
     } catch (e) {
       setFehler(e instanceof Error ? e.message : "Anlegen fehlgeschlagen.");
     } finally {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { AblageHinweis } from "@/components/haendler/ablage-hinweis";
 import { VorgangAnlegen } from "@/components/haendler/vorgang-anlegen";
 import { Container } from "@/components/ui";
 import { dealerAusSitzung, SITZUNGSCOOKIE } from "@/lib/dealers";
@@ -29,6 +30,7 @@ export default async function Page() {
         und trägt Fahrzeug-, Halter- und Zahlungsdaten selbst ein.
       </p>
       <div className="mt-9">
+        <AblageHinweis />
         <VorgangAnlegen />
       </div>
     </Container>

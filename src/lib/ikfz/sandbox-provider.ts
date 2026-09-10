@@ -1,5 +1,4 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { getSpeicher } from "../storage";
 import {
   ABRUFFENSTER_MINUTEN,
   NACHWEIS_GUELTIGKEIT_TAGE,
@@ -27,32 +26,20 @@ import {
  * Partner-Adapter umgestellt; die Anwendung selbst ändert sich nicht.
  */
 
-const DIR = path.join(process.env.ORDER_DATA_DIR ?? ".data", "ikfz");
-
 interface SandboxRecord {
   antrag: IkfzAntrag;
   antwort: IkfzAntwort;
 }
 
+const schluessel = (antragId: string) =>
+  `ikfz:${antragId.replace(/[^A-Za-z0-9_-]/g, "")}`;
+
 async function write(record: SandboxRecord) {
-  await fs.mkdir(DIR, { recursive: true });
-  await fs.writeFile(
-    path.join(DIR, `${record.antwort.antragId}.json`),
-    JSON.stringify(record, null, 2),
-    "utf8",
-  );
+  await getSpeicher().schreib(schluessel(record.antwort.antragId), record);
 }
 
 async function read(antragId: string): Promise<SandboxRecord | null> {
-  try {
-    const raw = await fs.readFile(
-      path.join(DIR, `${antragId.replace(/[^A-Za-z0-9_-]/g, "")}.json`),
-      "utf8",
-    );
-    return JSON.parse(raw) as SandboxRecord;
-  } catch {
-    return null;
-  }
+  return getSpeicher().lies<SandboxRecord>(schluessel(antragId));
 }
 
 function endeDesTages(datum: Date): Date {

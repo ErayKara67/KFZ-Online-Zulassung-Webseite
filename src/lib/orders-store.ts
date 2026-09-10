@@ -1,17 +1,17 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { getSpeicher } from "./storage";
 
 /**
- * Einfache dateibasierte Ablage für Aufträge.
+ * Ablage für Aufträge.
  *
- * Für den Produktivbetrieb sollte hier eine Datenbank angebunden werden
- * (z. B. PostgreSQL über Prisma). Die Schnittstelle unten bleibt dabei gleich –
- * es müssen nur die vier Funktionen ersetzt werden. Siehe README.
+ * Die eigentliche Speichertechnik steckt in storage.ts – lokal das
+ * Dateisystem, im Betrieb eine Datenbank. Hier stehen nur die fachlichen
+ * Zugriffe.
  */
 
-const DATA_DIR = process.env.ORDER_DATA_DIR ?? path.join(process.cwd(), ".data");
-const ORDER_DIR = path.join(DATA_DIR, "orders");
-export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
+/** Schlüssel eines Auftrags in der Ablage */
+const auftragsSchluessel = (id: string) => `auftrag:${sanitize(id)}`;
+/** Menge aller Auftragsnummern eines Autohauses */
+const haendlerMenge = (dealerId: string) => `haendler:${sanitize(dealerId)}`;
 
 export type OrderStatus =
   | "offen"
@@ -77,7 +77,8 @@ export interface StoredOrder {
   service: string;
   email: string;
   payload: unknown;
-  files: { field: string; filename: string; size: number; storedAs: string }[];
+  /** Nur die Nachweise – die Dateien selbst werden nicht abgelegt */
+  files: { field: string; filename: string; size: number }[];
   paymentRef?: string;
   /** Zugriffscode für die Auftragsverfolgung ohne Kundenkonto */
   accessToken: string;
@@ -114,11 +115,6 @@ export interface StoredOrder {
   }[];
 }
 
-async function ensureDirs() {
-  await fs.mkdir(ORDER_DIR, { recursive: true });
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
-}
-
 /** Fügt einen Schritt zur Auftragsverfolgung hinzu, sofern er noch fehlt. */
 export function withTimeline(
   timeline: TimelineEntry[],
@@ -130,49 +126,31 @@ export function withTimeline(
 }
 
 export async function saveOrder(order: StoredOrder): Promise<void> {
-  await ensureDirs();
-  await fs.writeFile(
-    path.join(ORDER_DIR, `${order.id}.json`),
-    JSON.stringify(order, null, 2),
-    "utf8",
-  );
+  const speicher = getSpeicher();
+  await speicher.schreib(auftragsSchluessel(order.id), order);
+
+  /* Index je Autohaus, damit die Übersicht ohne vollen Durchlauf auskommt. */
+  if (order.dealerId) {
+    await speicher.mengeErgaenzen(haendlerMenge(order.dealerId), order.id);
+  }
 }
 
-/**
- * Alle Aufträge eines Autohauses, neueste zuerst.
- *
- * Liest das Verzeichnis durch – für den Anfang völlig ausreichend. Mit einer
- * Datenbank wird daraus eine Abfrage mit Index auf dealerId.
- */
+/** Alle Aufträge eines Autohauses, neueste zuerst. */
 export async function listOrdersByDealer(dealerId: string): Promise<StoredOrder[]> {
-  try {
-    const dateien = await fs.readdir(ORDER_DIR);
-    const auftraege: StoredOrder[] = [];
+  const speicher = getSpeicher();
+  const nummern = await speicher.mengeLesen(haendlerMenge(dealerId));
 
-    for (const datei of dateien) {
-      if (!datei.endsWith(".json")) continue;
-      try {
-        const roh = await fs.readFile(path.join(ORDER_DIR, datei), "utf8");
-        const order = JSON.parse(roh) as StoredOrder;
-        if (order.dealerId === dealerId) auftraege.push(order);
-      } catch {
-        /* beschädigte Datei überspringen */
-      }
-    }
+  const geladen = await Promise.all(
+    nummern.map((nummer) => speicher.lies<StoredOrder>(auftragsSchluessel(nummer))),
+  );
 
-    return auftraege.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  } catch {
-    return [];
-  }
+  return geladen
+    .filter((o): o is StoredOrder => Boolean(o))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function getOrder(id: string): Promise<StoredOrder | null> {
-  try {
-    const raw = await fs.readFile(path.join(ORDER_DIR, `${sanitize(id)}.json`), "utf8");
-    return JSON.parse(raw) as StoredOrder;
-  } catch {
-    return null;
-  }
+  return getSpeicher().lies<StoredOrder>(auftragsSchluessel(id));
 }
 
 export async function updateOrder(
@@ -190,21 +168,31 @@ export async function updateOrder(
   return updated;
 }
 
-export async function storeUpload(
-  orderId: string,
-  field: string,
-  file: File,
-): Promise<{ field: string; filename: string; size: number; storedAs: string }> {
-  await ensureDirs();
-  const dir = path.join(UPLOAD_DIR, sanitize(orderId));
-  await fs.mkdir(dir, { recursive: true });
+export interface HochgeladeneDatei {
+  field: string;
+  filename: string;
+  size: number;
+  contentType: string;
+  inhalt: Buffer;
+}
 
-  const ext = path.extname(file.name).slice(0, 8).replace(/[^a-zA-Z0-9.]/g, "");
-  const storedAs = path.join(dir, `${sanitize(field)}${ext || ""}`);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await fs.writeFile(storedAs, buffer);
-
-  return { field, filename: file.name, size: file.size, storedAs };
+/**
+ * Nimmt eine hochgeladene Datei entgegen, ohne sie abzulegen.
+ *
+ * Die Dokumente gehen als Anhang an die Sachbearbeitung und werden nicht
+ * gespeichert. Das ist bewusst so: Ausweis- und Fahrzeugpapiere sind das
+ * Heikelste am ganzen Vorgang, und was nicht liegt, kann nicht abfließen.
+ * Wer sie dauerhaft braucht, bindet hier einen Objektspeicher an (S3 o. Ä.)
+ * und trägt die Aufbewahrungsfrist in die Datenschutzerklärung ein.
+ */
+export async function readUpload(field: string, file: File): Promise<HochgeladeneDatei> {
+  return {
+    field,
+    filename: file.name,
+    size: file.size,
+    contentType: file.type || "application/octet-stream",
+    inhalt: Buffer.from(await file.arrayBuffer()),
+  };
 }
 
 function sanitize(value: string): string {

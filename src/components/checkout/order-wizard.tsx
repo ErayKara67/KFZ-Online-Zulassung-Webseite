@@ -26,6 +26,7 @@ import { VOLLMACHT_TEXT, VOLLMACHT_VERSION } from "@/lib/ikfz/vollmacht-text";
 import { Button, Field, inputClass, Check } from "../ui";
 import { LicensePlate } from "../license-plate";
 import { OrderSummary } from "./order-summary";
+import { leseJson } from "@/lib/antwort";
 
 /* ------------------------------------------------------------------ Typen */
 
@@ -391,21 +392,27 @@ export function OrderWizard() {
       }
 
       const orderRes = await fetch("/api/bestellung", { method: "POST", body: form });
-      const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData?.error ?? "Auftrag konnte nicht angelegt werden.");
+      const { ok: orderOk, daten: orderData, fehler: orderFehler } = await leseJson<{
+        orderId: string;
+      }>(orderRes);
+      if (!orderOk || !orderData) {
+        throw new Error(orderFehler ?? "Auftrag konnte nicht angelegt werden.");
+      }
 
       const payRes = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId: orderData.orderId }),
       });
-      const payData = await payRes.json();
-      if (!payRes.ok || !payData?.url) {
-        throw new Error(payData?.error ?? "Die Zahlung konnte nicht gestartet werden.");
+      const { ok: payOk, daten: payData, fehler: payFehler } = await leseJson<{
+        url: string;
+      }>(payRes);
+      if (!payOk || !payData?.url) {
+        throw new Error(payFehler ?? "Die Zahlung konnte nicht gestartet werden.");
       }
 
       sessionStorage.removeItem(STORAGE_KEY);
-      window.location.assign(payData.url as string);
+      window.location.assign(payData.url);
     } catch (e) {
       setSubmitError(
         e instanceof Error ? e.message : "Unbekannter Fehler bei der Übermittlung.",

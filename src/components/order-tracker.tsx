@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Check } from "./ui";
 import { LicensePlate } from "./license-plate";
+import { leseJson } from "@/lib/antwort";
 
 interface TimelineEntry {
   key: string;
@@ -132,9 +133,9 @@ export function OrderTracker({ id, code }: { id: string; code: string }) {
         `/api/auftrag/${encodeURIComponent(id)}?code=${encodeURIComponent(code)}`,
         { cache: "no-store" },
       );
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? "Auftrag nicht gefunden.");
-      setDaten(json as AuftragsStatus);
+      const { ok, daten: json, fehler: meldung } = await leseJson<AuftragsStatus>(res);
+      if (!ok || !json) throw new Error(meldung ?? "Auftrag nicht gefunden.");
+      setDaten(json);
       setFehler(null);
     } catch (e) {
       setFehler(e instanceof Error ? e.message : "Unbekannter Fehler.");
@@ -170,10 +171,13 @@ export function OrderTracker({ id, code }: { id: string; code: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, aktion: name }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.hinweis ?? json?.error ?? "Aktion fehlgeschlagen.");
+      const { ok, daten: json, fehler: meldung } = await leseJson<{
+        hinweis?: string;
+        weiterleitungUrl?: string;
+      }>(res);
+      if (!ok) throw new Error(json?.hinweis ?? meldung ?? "Aktion fehlgeschlagen.");
       if (json?.weiterleitungUrl) {
-        window.location.assign(json.weiterleitungUrl as string);
+        window.location.assign(json.weiterleitungUrl);
         return;
       }
       await holen();

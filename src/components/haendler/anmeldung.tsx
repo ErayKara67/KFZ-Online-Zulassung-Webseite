@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Field, inputClass } from "../ui";
+import { leseJson } from "@/lib/antwort";
 
 export function Anmeldung({ demoBetrieb }: { demoBetrieb: boolean }) {
   const router = useRouter();
@@ -20,8 +21,8 @@ export function Anmeldung({ demoBetrieb }: { demoBetrieb: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? "Anmeldung fehlgeschlagen.");
+      const { ok, fehler: meldung } = await leseJson<unknown>(res);
+      if (!ok) throw new Error(meldung ?? "Anmeldung fehlgeschlagen.");
       router.push("/haendler/uebersicht");
       router.refresh();
     } catch (e) {
