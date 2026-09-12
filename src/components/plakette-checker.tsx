@@ -86,7 +86,7 @@ export function PlaketteChecker({ kennzeichen = "" }: { kennzeichen?: string }) 
 
       <div className="mt-6 space-y-5">
         <fieldset>
-          <legend className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
+          <legend className="mb-2 text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
             Antriebsart
           </legend>
           <div className="flex flex-wrap gap-2">
@@ -116,7 +116,7 @@ export function PlaketteChecker({ kennzeichen = "" }: { kennzeichen?: string }) 
             <div>
               <label
                 htmlFor="pk-norm"
-                className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3"
+                className="mb-2 block text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3"
               >
                 Schadstoffklasse — Feld 14 der Zulassungsbescheinigung
               </label>

@@ -17,7 +17,8 @@ const zahlarten = ["Kreditkarte", "PayPal", "Klarna", "Apple Pay", "Google Pay"]
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-line bg-sunk">
+    /* safe-bottom hält den Fußbereich über dem Bedienbalken neuerer iPhones */
+    <footer className="safe-bottom border-t border-line bg-sunk">
       <Container className="grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
         <div>
           <div className="flex items-center gap-3">
@@ -55,7 +56,7 @@ export function SiteFooter() {
         </div>
 
         <nav aria-label="Leistungen">
-          <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
+          <h2 className="text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
             Leistungen
           </h2>
           <ul className="mt-5 space-y-3 text-sm">
@@ -70,7 +71,7 @@ export function SiteFooter() {
         </nav>
 
         <nav aria-label="Service">
-          <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
+          <h2 className="text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
             Service
           </h2>
           <ul className="mt-5 space-y-3 text-sm">
@@ -111,7 +112,7 @@ export function SiteFooter() {
 
         <div className="space-y-7">
           <div>
-            <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
+            <h2 className="text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
               Zahlungsarten
             </h2>
             <ul className="mt-5 flex flex-wrap gap-2">
@@ -126,7 +127,7 @@ export function SiteFooter() {
             </ul>
           </div>
           <div>
-            <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
+            <h2 className="text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
               Versand &amp; Sicherheit
             </h2>
             <ul className="mt-5 space-y-2 text-sm text-ink-3">

@@ -134,7 +134,7 @@ export function DistrictCombobox({
                   {d.code}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm text-ink">{d.city}</span>
-                <span className="shrink-0 text-[0.7rem] text-ink-4">{d.state}</span>
+                <span className="shrink-0 text-[0.75rem] sm:text-[0.7rem] text-ink-4">{d.state}</span>
               </button>
             </li>
           ))}
@@ -142,7 +142,7 @@ export function DistrictCombobox({
       ) : null}
 
       {gewaehlt && !offen ? (
-        <p className="mt-1.5 truncate text-center text-[0.7rem] text-ink-3">
+        <p className="mt-1.5 truncate text-center text-[0.75rem] sm:text-[0.7rem] text-ink-3">
           {gewaehlt.city}
         </p>
       ) : null}

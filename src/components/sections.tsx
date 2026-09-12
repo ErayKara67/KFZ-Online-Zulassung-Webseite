@@ -124,7 +124,7 @@ export function AutohausSection() {
                 ) : null}
               </div>
               <div className="pt-1.5">
-                <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-accent-bright">
+                <p className="text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-accent-bright">
                   {s.zeit}
                 </p>
                 <h3 className="mt-2 text-lg font-bold tracking-tight text-ink">{s.titel}</h3>
@@ -182,7 +182,7 @@ export function SofortSection() {
         </div>
 
         <Card className="bg-ground">
-          <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
+          <h3 className="text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-ink-3">
             Zeitplan einer Sofortzulassung
           </h3>
           <ol className="mt-6 space-y-5">
@@ -193,7 +193,7 @@ export function SofortSection() {
               ["bis Tag 14", "Papiere und Plaketten kommen per Post und werden angebracht"],
             ].map(([tag, text]) => (
               <li key={text} className="grid grid-cols-[5.5rem_1fr] gap-4">
-                <span className="text-[0.7rem] font-bold uppercase tracking-wider text-accent-bright tnum">
+                <span className="text-[0.75rem] sm:text-[0.7rem] font-bold uppercase tracking-wider text-accent-bright tnum">
                   {tag}
                 </span>
                 <span className="text-sm leading-relaxed text-ink-2">{text}</span>
@@ -455,10 +455,10 @@ export function DistrictsSection() {
           </caption>
           <thead>
             <tr className="bg-card text-left">
-              <th scope="col" className="px-5 py-3.5 text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">Kürzel</th>
-              <th scope="col" className="px-5 py-3.5 text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">Zulassungsbezirk</th>
-              <th scope="col" className="px-5 py-3.5 text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">Bundesland</th>
-              <th scope="col" className="px-5 py-3.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">Aktion</th>
+              <th scope="col" className="px-5 py-3.5 text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">Kürzel</th>
+              <th scope="col" className="px-5 py-3.5 text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">Zulassungsbezirk</th>
+              <th scope="col" className="px-5 py-3.5 text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">Bundesland</th>
+              <th scope="col" className="px-5 py-3.5 text-right text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">Aktion</th>
             </tr>
           </thead>
           <tbody>

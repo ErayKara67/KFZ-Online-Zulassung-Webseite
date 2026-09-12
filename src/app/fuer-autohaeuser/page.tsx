@@ -102,10 +102,10 @@ export default function Page() {
             <caption className="sr-only">Aufwand heute im Vergleich zum Zulassungsservice</caption>
             <thead>
               <tr className="bg-ground text-left">
-                <th scope="col" className="px-5 py-3.5 text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
+                <th scope="col" className="px-5 py-3.5 text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
                   Heute in Ihrem Haus
                 </th>
-                <th scope="col" className="px-5 py-3.5 text-[0.7rem] font-semibold uppercase tracking-wider text-accent-bright">
+                <th scope="col" className="px-5 py-3.5 text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-accent-bright">
                   Mit uns
                 </th>
               </tr>
@@ -182,7 +182,7 @@ export default function Page() {
             },
           ].map((s, i) => (
             <li key={s.titel} className="rounded-[var(--radius-card)] border border-line bg-ground p-6">
-              <span className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-accent-bright">
+              <span className="text-[0.75rem] sm:text-[0.7rem] font-bold uppercase tracking-[0.16em] text-accent-bright">
                 {s.wer}
               </span>
               <span className="mt-3 block text-3xl font-bold tabular-nums text-line-lit">

@@ -157,7 +157,16 @@ function CheckboxRow({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="flex cursor-pointer items-start gap-3 text-sm text-ink-2">
+      {/*
+        py-2 mit ausgleichendem -my-2: Die Trefferfläche wächst oben und unten
+        um acht Pixel, das Schriftbild bleibt unverändert. Bei einzeiligen
+        Beschriftungen wäre die Zeile sonst nur gut zwanzig Pixel hoch – zu
+        wenig, um sie mit dem Daumen sicher zu treffen.
+      */}
+      <label
+        htmlFor={id}
+        className="-my-2 flex cursor-pointer items-start gap-3 py-2 text-sm text-ink-2"
+      >
         <input
           id={id}
           type="checkbox"
@@ -333,11 +342,37 @@ export function OrderWizard() {
   }
 
 
+  /**
+   * Springt zum ersten beanstandeten Feld und setzt den Schreibcursor hinein.
+   *
+   * Die Reihenfolge kommt aus dem Dokument, nicht aus der Fehlerliste: Welches
+   * Feld zuerst geprüft wurde, muss nicht das oberste auf dem Bildschirm sein.
+   * Der Aufruf wartet einen Bilddurchlauf ab, weil die Markierungen erst nach
+   * dem nächsten Zeichnen im Dokument stehen.
+   */
+  function zumErstenFehler() {
+    requestAnimationFrame(() => {
+      const markiert = [...document.querySelectorAll<HTMLElement>("[data-fehlerfeld]")];
+      const ziel = markiert
+        .map((el) => document.getElementById(el.dataset.fehlerfeld ?? ""))
+        .find((el): el is HTMLElement => el !== null);
+
+      if (!ziel) {
+        document.getElementById("wizard-top")?.scrollIntoView({ behavior: "smooth" });
+        return;
+      }
+
+      ziel.scrollIntoView({ behavior: "smooth", block: "center" });
+      /* preventScroll: der Sprung oben soll nicht doppelt ausgelöst werden */
+      ziel.focus({ preventScroll: true });
+    });
+  }
+
   function next() {
     const found = validateStep(current.id);
     setErrors(found);
     if (Object.keys(found).length > 0) {
-      document.getElementById("wizard-top")?.scrollIntoView({ behavior: "smooth" });
+      zumErstenFehler();
       return;
     }
     setStep((s) => Math.min(s + 1, stepList.length - 1));
@@ -432,8 +467,37 @@ export function OrderWizard() {
   return (
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div id="wizard-top" className="scroll-mt-28">
-        {/* Fortschritt */}
-        <ol className="mb-9 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+        {/*
+          Fortschritt, zweifach.
+
+          Auf dem Handy passt die Schrittleiste nicht in eine Zeile; umgebrochen
+          nimmt sie zwei Zeilen ein und drängt den eigentlichen Inhalt nach
+          unten, ohne mehr zu sagen als „wo bin ich, wie viel fehlt". Genau das
+          steht kompakt darüber — ab Tablettbreite wieder die volle Leiste.
+        */}
+        <div className="mb-7 sm:hidden">
+          <div className="flex items-baseline justify-between">
+            <p className="text-sm font-semibold text-ink">{current.label}</p>
+            <p className="text-xs text-ink-3 tnum">
+              Schritt {step + 1} von {stepList.length}
+            </p>
+          </div>
+          <div
+            className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-card"
+            role="progressbar"
+            aria-valuenow={step + 1}
+            aria-valuemin={1}
+            aria-valuemax={stepList.length}
+            aria-label={`Schritt ${step + 1} von ${stepList.length}: ${current.label}`}
+          >
+            <div
+              className="h-full rounded-full bg-accent transition-[width] duration-300"
+              style={{ width: `${((step + 1) / stepList.length) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        <ol className="mb-9 hidden flex-wrap items-center gap-x-3 gap-y-2 text-sm sm:flex">
           {stepList.map((s, i) => {
             const state = i < step ? "done" : i === step ? "current" : "todo";
             return (
@@ -570,6 +634,10 @@ export function OrderWizard() {
                     <Field label="Ort" htmlFor="w-district" required error={errors["plate.district"]}>
                       <input
                         id="w-district"
+                        autoComplete="off"
+                        autoCapitalize="characters"
+                        autoCorrect="off"
+                        spellCheck={false}
                         list="w-districts"
                         maxLength={3}
                         value={draft.plate.district}
@@ -591,6 +659,10 @@ export function OrderWizard() {
                     <Field label="Buchst." htmlFor="w-letters" required error={errors["plate.letters"]}>
                       <input
                         id="w-letters"
+                        autoComplete="off"
+                        autoCapitalize="characters"
+                        autoCorrect="off"
+                        spellCheck={false}
                         maxLength={2}
                         value={draft.plate.letters}
                         onChange={(e) =>
@@ -604,6 +676,7 @@ export function OrderWizard() {
                     <Field label="Zahlen" htmlFor="w-numbers" required error={errors["plate.numbers"]}>
                       <input
                         id="w-numbers"
+                        autoComplete="off"
                         maxLength={4}
                         inputMode="numeric"
                         value={draft.plate.numbers}
@@ -711,12 +784,16 @@ export function OrderWizard() {
                 label="Fahrzeug-Identifizierungsnummer (FIN)"
                 htmlFor="v-vin"
                 required
-                hint="17 Zeichen, Feld E der Zulassungsbescheinigung."
+                hint="Die 17-stellige Fahrgestellnummer. Sie steht im Fahrzeugschein im Feld E und ist außerdem im Motorraum oder am Türholm eingeprägt."
                 error={errors["vehicle.vin"]}
                 className="sm:col-span-2"
               >
                 <input
                   id="v-vin"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
                   maxLength={17}
                   value={draft.vehicle.vin}
                   onChange={(e) => patch("vehicle", { vin: e.target.value.toUpperCase() })}
@@ -728,19 +805,28 @@ export function OrderWizard() {
                 label="Nummer der Zulassungsbescheinigung Teil II"
                 htmlFor="v-zb2"
                 required
+                hint="Teil II ist der frühere Fahrzeugbrief — das Dokument, das zu Hause bleibt. Die Nummer steht dort neben dem grünen Rubbelfeld und zusätzlich oben auf dem Fahrzeugschein."
                 error={errors["vehicle.zbTeil2"]}
               >
                 <input
                   id="v-zb2"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={draft.vehicle.zbTeil2}
                   onChange={(e) => patch("vehicle", { zbTeil2: e.target.value.toUpperCase() })}
                   className={`${inputClass} font-mono uppercase`}
                 />
               </Field>
 
-              <Field label="Bisheriges Kennzeichen" htmlFor="v-prev" hint="Nur bei Gebrauchtfahrzeugen.">
+              <Field label="Bisheriges Kennzeichen" htmlFor="v-prev" hint="Nur bei Gebrauchtfahrzeugen — das Kennzeichen, mit dem das Auto bisher gefahren ist.">
                 <input
                   id="v-prev"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={draft.vehicle.previousPlate}
                   onChange={(e) => patch("vehicle", { previousPlate: e.target.value.toUpperCase() })}
                   className={`${inputClass} uppercase`}
@@ -750,6 +836,8 @@ export function OrderWizard() {
               <Field label="Hersteller" htmlFor="v-make" required error={errors["vehicle.make"]}>
                 <input
                   id="v-make"
+                  autoComplete="off"
+                  autoCapitalize="words"
                   value={draft.vehicle.make}
                   onChange={(e) => patch("vehicle", { make: e.target.value })}
                   className={inputClass}
@@ -759,13 +847,15 @@ export function OrderWizard() {
               <Field label="Modell" htmlFor="v-model" required error={errors["vehicle.model"]}>
                 <input
                   id="v-model"
+                  autoComplete="off"
+                  autoCapitalize="words"
                   value={draft.vehicle.model}
                   onChange={(e) => patch("vehicle", { model: e.target.value })}
                   className={inputClass}
                 />
               </Field>
 
-              <Field label="Erstzulassung" htmlFor="v-first">
+              <Field label="Erstzulassung" htmlFor="v-first" hint="Der Tag, an dem das Fahrzeug zum ersten Mal angemeldet wurde. Im Fahrzeugschein Feld B.">
                 <input
                   id="v-first"
                   type="date"
@@ -775,7 +865,7 @@ export function OrderWizard() {
                 />
               </Field>
 
-              <Field label="Hauptuntersuchung gültig bis" htmlFor="v-hu">
+              <Field label="Hauptuntersuchung gültig bis" htmlFor="v-hu" hint="Umgangssprachlich der TÜV. Monat und Jahr stehen auf der runden Plakette am hinteren Kennzeichen.">
                 <input
                   id="v-hu"
                   type="month"
@@ -856,9 +946,11 @@ export function OrderWizard() {
                   />
                 </Field>
 
-                <Field label="Geburtsort" htmlFor="h-birthplace">
+                <Field label="Geburtsort" htmlFor="h-birthplace" hint="Nur nötig, wenn die Behörde rückfragt.">
                   <input
                     id="h-birthplace"
+                    autoComplete="off"
+                    autoCapitalize="words"
                     value={draft.holder.birthPlace}
                     onChange={(e) => patch("holder", { birthPlace: e.target.value })}
                     className={inputClass}
@@ -941,18 +1033,30 @@ export function OrderWizard() {
                   ist keine Zulassung möglich.
                 </p>
                 <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                  <Field label="eVB-Nummer" htmlFor="i-evb" required error={errors["insurance.evb"]}>
+                  <Field
+                    label="eVB-Nummer"
+                    htmlFor="i-evb"
+                    required
+                    hint="Sieben Zeichen aus Buchstaben und Ziffern. Sie bekommen die Nummer kostenlos von Ihrer Kfz-Versicherung, meist binnen Minuten per E-Mail oder SMS."
+                    error={errors["insurance.evb"]}
+                  >
                     <input
                       id="i-evb"
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
                       maxLength={7}
                       value={draft.insurance.evb}
                       onChange={(e) => patch("insurance", { evb: e.target.value.toUpperCase() })}
                       className={`${inputClass} font-mono uppercase tracking-widest`}
                     />
                   </Field>
-                  <Field label="Versicherungsgesellschaft" htmlFor="i-insurer">
+                  <Field label="Versicherungsgesellschaft" htmlFor="i-insurer" hint="Freiwillig. Hilft uns bei Rückfragen.">
                     <input
                       id="i-insurer"
+                      autoComplete="off"
+                      autoCapitalize="words"
                       value={draft.insurance.insurer}
                       onChange={(e) => patch("insurance", { insurer: e.target.value })}
                       className={inputClass}
@@ -980,14 +1084,27 @@ export function OrderWizard() {
                   >
                     <input
                       id="s-holder"
+                      autoComplete="name"
+                      autoCapitalize="words"
                       value={draft.sepa.accountHolder}
                       onChange={(e) => patch("sepa", { accountHolder: e.target.value })}
                       className={inputClass}
                     />
                   </Field>
-                  <Field label="IBAN" htmlFor="s-iban" required error={errors["sepa.iban"]}>
+                  <Field
+                    label="IBAN"
+                    htmlFor="s-iban"
+                    required
+                    hint="Für die Kfz-Steuer. Wir speichern die IBAN nur unkenntlich gemacht — abgebucht wird ausschließlich vom Hauptzollamt, nicht von uns."
+                    error={errors["sepa.iban"]}
+                  >
                     <input
                       id="s-iban"
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      inputMode="text"
                       value={draft.sepa.iban}
                       onChange={(e) => patch("sepa", { iban: e.target.value.toUpperCase() })}
                       className={`${inputClass} font-mono uppercase`}
@@ -1051,6 +1168,7 @@ export function OrderWizard() {
                     <Field label="Straße und Hausnummer" htmlFor="sh-street" className="sm:col-span-3">
                       <input
                         id="sh-street"
+                        autoComplete="shipping street-address"
                         value={draft.shipping.street}
                         onChange={(e) => patch("shipping", { street: e.target.value })}
                         className={inputClass}
@@ -1059,6 +1177,8 @@ export function OrderWizard() {
                     <Field label="PLZ" htmlFor="sh-zip">
                       <input
                         id="sh-zip"
+                        inputMode="numeric"
+                        autoComplete="shipping postal-code"
                         maxLength={5}
                         value={draft.shipping.zip}
                         onChange={(e) =>
@@ -1070,6 +1190,8 @@ export function OrderWizard() {
                     <Field label="Ort" htmlFor="sh-city" className="sm:col-span-2">
                       <input
                         id="sh-city"
+                        autoComplete="shipping address-level2"
+                        autoCapitalize="words"
                         value={draft.shipping.city}
                         onChange={(e) => patch("shipping", { city: e.target.value })}
                         className={inputClass}
@@ -1340,7 +1462,13 @@ export function OrderWizard() {
         ) : null}
 
         {/* ------------------------------------------------------ Navigation */}
-        <div className="mt-10 flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
+        {/*
+          Auf dem Handy bleibt die Navigation am unteren Rand stehen. Die
+          Halterseite ist lang; ohne das müsste man nach jedem Ausfüllen erst
+          ans Ende scrollen, um weiterzukommen. Ab Tablettbreite läuft die
+          Leiste wieder normal mit, dort ist der Weg zum Knopf kurz genug.
+        */}
+        <div className="safe-bottom sticky bottom-0 z-30 mt-10 flex items-center justify-between gap-3 border-t border-line bg-ground/95 pt-3 pb-3 backdrop-blur sm:static sm:bg-transparent sm:pt-6 sm:pb-0 sm:backdrop-blur-none">
           {step > 0 ? (
             <Button type="button" variant="secondary" onClick={back}>
               ← Zurück

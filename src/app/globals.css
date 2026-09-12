@@ -21,7 +21,14 @@
   /* Schrift */
   --color-ink:       #f1f4f8;
   --color-ink-2:     #a9b4c2;
-  --color-ink-3:     #75818f;
+  /*
+   * Nebentext. Der frühere Wert #75818f kam auf hellen Flächen nur auf 4,04:1
+   * und lag damit unter der Lesbarkeitsschwelle von 4,5:1 – ausgerechnet bei
+   * den Erklärungen unter den Eingabefeldern, also dem Text, den jemand liest,
+   * der nicht weiß, was eine eVB-Nummer ist. Der neue Wert erreicht auf der
+   * hellsten Fläche 5,4:1 und bleibt optisch trotzdem zurückgenommen.
+   */
+  --color-ink-3:     #8b97a5;
   --color-ink-4:     #56606d;
 
   /* Marke – wird zur Laufzeit aus brand.ts überschrieben */
@@ -138,4 +145,72 @@ body {
 @media print {
   header nav, footer, .no-print { display: none !important; }
   body { background: #fff; color: #000; }
+}
+
+/* ---------------------------------------------------------------------------
+   Mobilgeräte
+   Zusammengefasst, damit an einer Stelle steht, was iPhone und Android
+   brauchen und warum.
+   --------------------------------------------------------------------------- */
+
+/*
+ * Seitenabstand, der die geräteeigenen Sperrflächen einrechnet: die Notch im
+ * Querformat links bzw. rechts. Ohne max() würde der Inhalt auf Geräten ohne
+ * Notch am Rand kleben.
+ */
+.gutter {
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
+}
+@media (min-width: 640px) {
+  .gutter {
+    padding-left: max(2rem, env(safe-area-inset-left));
+    padding-right: max(2rem, env(safe-area-inset-right));
+  }
+}
+
+/* Der Balken am unteren Rand neuerer iPhones überdeckt sonst den Fußbereich. */
+.safe-bottom {
+  padding-bottom: max(var(--safe-bottom-basis, 0px), env(safe-area-inset-bottom));
+}
+
+html {
+  /*
+   * Safari vergrößert beim Drehen ins Querformat eigenmächtig die Schrift.
+   * Das zerreißt das Layout an Stellen, die auf feste Zeilenlängen gerechnet
+   * sind; die Seite bleibt weiterhin per Zwei-Finger-Geste vergrößerbar.
+   */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+
+  /* Der graue Kasten, den Android beim Antippen über Links legt, passt nicht
+     zum dunklen Auftritt – stattdessen ein kurzes Aufleuchten in Markenfarbe. */
+  -webkit-tap-highlight-color: color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+/*
+ * Lange ununterbrochene Zeichenketten – Fahrgestellnummern, E-Mail-Adressen,
+ * Auftragslinks – schieben eine schmale Seite sonst in die Breite. Dann lässt
+ * sie sich waagerecht scrollen, was auf dem Handy wie ein Fehler wirkt.
+ */
+body {
+  overflow-wrap: break-word;
+}
+
+/*
+ * Auf Zeigegeräten ohne feine Maus – also Finger – bekommen Bedienelemente
+ * mindestens 44 Pixel Höhe. Das ist die Größe, ab der eine Fingerkuppe
+ * zuverlässig trifft, ohne dass daneben etwas anderes ausgelöst wird.
+ *
+ * Ankreuz- und Auswahlfelder bleiben bewusst klein: Ihre Trefferfläche ist die
+ * Beschriftung daneben, die das Feld mit umschließt. Das Kästchen selbst zu
+ * vergrößern würde nur das Schriftbild stören, ohne etwas zu verbessern.
+ */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  select,
+  summary {
+    min-height: 44px;
+  }
 }

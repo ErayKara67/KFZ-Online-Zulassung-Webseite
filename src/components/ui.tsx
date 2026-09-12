@@ -9,7 +9,12 @@ export function Container({
   className?: string;
 }) {
   return (
-    <div className={`mx-auto w-full max-w-6xl px-5 sm:px-8 ${className}`}>
+    /*
+     * „gutter" statt fester Seitenabstände: Auf iPhones im Querformat liegt
+     * unter der Notch ein Bereich, in dem nichts lesbar ist. Die Klasse rechnet
+     * den Geräteabstand ein und hält sonst die normalen 20 bzw. 32 Pixel.
+     */
+    <div className={`gutter mx-auto w-full max-w-6xl ${className}`}>
       {children}
     </div>
   );
@@ -46,7 +51,7 @@ export function Section({
 
 export function Eyebrow({ children }: { children: ReactNode }) {
   return (
-    <p className="mb-4 flex items-center gap-2.5 text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-accent-bright">
+    <p className="mb-4 flex items-center gap-2.5 text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-accent-bright">
       <span aria-hidden="true" className="h-px w-7 bg-accent" />
       {children}
     </p>
@@ -178,7 +183,7 @@ export function Badge({
   } as const;
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wider ring-1 ${tones[tone]}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider ring-1 ${tones[tone]}`}
     >
       {children}
     </span>
@@ -203,7 +208,14 @@ export function Field({
   className?: string;
 }) {
   return (
-    <div className={className}>
+    /*
+     * data-fehlerfeld markiert das Feld für den Assistenten: Nach einer
+     * fehlgeschlagenen Prüfung springt er zum ersten so markierten Feld und
+     * setzt den Schreibcursor hinein. Ohne das müsste man auf dem Handy die
+     * Fehlerliste lesen, dann selbst nach unten suchen, welches Feld gemeint
+     * ist.
+     */
+    <div className={className} data-fehlerfeld={error ? htmlFor : undefined}>
       <label
         htmlFor={htmlFor}
         className="mb-1.5 block text-sm font-medium text-ink"
@@ -212,18 +224,41 @@ export function Field({
         {required ? <span className="text-accent-bright"> *</span> : null}
       </label>
       {children}
+      {/*
+        Die Hinweiszeile erklärt Fachbegriffe – für jemanden ohne Vorwissen ist
+        sie die wichtigste Zeile im Feld. Auf dem Handy deshalb 13 statt 12
+        Pixel; ab Tablettbreite sitzt man näher am Bildschirm und 12 genügen.
+      */}
       {hint && !error ? (
-        <p className="mt-1.5 text-xs leading-relaxed text-ink-3">{hint}</p>
+        <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-ink-3 sm:text-xs">
+          {hint}
+        </p>
       ) : null}
       {error ? (
-        <p className="mt-1.5 text-xs font-medium text-risk">{error}</p>
+        <p className="mt-1.5 text-[0.8125rem] font-medium text-risk sm:text-xs">
+          {error}
+        </p>
       ) : null}
     </div>
   );
 }
 
+/*
+ * Eingabefelder.
+ *
+ * Die 16px auf schmalen Bildschirmen sind kein Schönheitsentscheid: Safari auf
+ * dem iPhone zoomt beim Antippen automatisch in jedes Feld mit kleinerer
+ * Schrift. Der Kunde landet dann in einer vergrößerten Ansicht und muss nach
+ * jedem Feld wieder herauszoomen. Ab 640px Breite ist das kein Thema mehr,
+ * dort gelten wieder die 14px des übrigen Layouts.
+ *
+ * Der Fokusring ersetzt den abgeschalteten Standardrahmen – ohne ihn wäre für
+ * Menschen, die mit der Tastatur navigieren, nicht erkennbar, wo sie sind.
+ */
 export const inputClass =
-  "w-full rounded-[var(--radius-sm)] border border-line bg-raised px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-4 focus:border-accent focus:outline-none";
+  "w-full rounded-[var(--radius-sm)] border border-line bg-raised px-3.5 py-3 text-base text-ink placeholder:text-ink-4 " +
+  "focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 " +
+  "sm:py-2.5 sm:text-sm";
 
 export function Check({ className = "" }: { className?: string }) {
   return (

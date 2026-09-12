@@ -56,7 +56,7 @@ export function SiteHeader() {
             <span className="block whitespace-nowrap text-[0.95rem] font-bold tracking-tight text-ink">
               {brand.name}
             </span>
-            <span className="block text-[0.7rem] uppercase tracking-[0.16em] text-accent-bright">
+            <span className="block text-[0.75rem] sm:text-[0.7rem] uppercase tracking-[0.16em] text-accent-bright">
               {brand.tagline}
             </span>
           </span>

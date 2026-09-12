@@ -57,7 +57,7 @@ export default async function Page() {
       <AblageHinweis />
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div>
-          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-accent-bright">
+          <p className="text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-accent-bright">
             Händlerzugang
           </p>
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-ink sm:text-4xl">

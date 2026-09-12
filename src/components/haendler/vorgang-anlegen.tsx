@@ -71,7 +71,7 @@ export function VorgangAnlegen() {
         </p>
 
         <div className="mt-5">
-          <p className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
+          <p className="mb-2 text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
             Link zum Weitergeben
           </p>
           <div className="flex flex-wrap items-center gap-2">

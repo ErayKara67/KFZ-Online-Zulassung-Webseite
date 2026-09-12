@@ -171,14 +171,14 @@ export function PlateChecker({
 
             <div className="grid grid-cols-[1.15fr_0.85fr_1fr] gap-2.5">
               <div>
-                <label htmlFor="pc-district" className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
+                <label htmlFor="pc-district" className="mb-1.5 block text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
                   Ort
                 </label>
                 <DistrictCombobox id="pc-district" value={district} onChange={setDistrict} />
               </div>
 
               <div>
-                <label htmlFor="pc-letters" className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
+                <label htmlFor="pc-letters" className="mb-1.5 block text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
                   Buchst.
                 </label>
                 <input
@@ -197,7 +197,7 @@ export function PlateChecker({
               </div>
 
               <div>
-                <label htmlFor="pc-numbers" className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
+                <label htmlFor="pc-numbers" className="mb-1.5 block text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
                   Zahlen
                 </label>
                 <input
@@ -268,13 +268,13 @@ export function PlateChecker({
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <div>
-                <label htmlFor="id-district" className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
+                <label htmlFor="id-district" className="mb-1.5 block text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
                   Ort
                 </label>
                 <DistrictCombobox id="id-district" value={district} onChange={setDistrict} />
               </div>
               <div>
-                <label htmlFor="id-initialen" className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
+                <label htmlFor="id-initialen" className="mb-1.5 block text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
                   Initialen
                 </label>
                 <input
@@ -287,7 +287,7 @@ export function PlateChecker({
                 />
               </div>
               <div>
-                <label htmlFor="id-zahl" className="mb-1.5 block text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
+                <label htmlFor="id-zahl" className="mb-1.5 block text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
                   Zahl
                 </label>
                 <input
@@ -392,7 +392,7 @@ export function PlateChecker({
         {vorschlaege ? (
           vorschlaege.length > 0 ? (
             <div className="mt-6">
-              <p className="mb-3 text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
+              <p className="mb-3 text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
                 {vorschlaege.length} Vorschläge
               </p>
               <ul className="grid gap-2.5">
@@ -443,7 +443,7 @@ export function PlateChecker({
         {merkliste.length > 0 ? (
           <div className="mt-6 border-t border-line pt-5">
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
+              <p className="text-[0.75rem] sm:text-[0.7rem] font-semibold uppercase tracking-wider text-ink-3">
                 Gemerkt
               </p>
               <button
