@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import { Button, Field, inputClass } from "../ui";
 import { leseJson } from "@/lib/antwort";
 
-export function Anmeldung({ demoBetrieb }: { demoBetrieb: boolean }) {
+export function Anmeldung({
+  demoBetrieb,
+  zugangFehlt,
+}: {
+  demoBetrieb: boolean;
+  /** öffentlich erreichbar, aber niemand eingetragen — Anmeldung unmöglich */
+  zugangFehlt: boolean;
+}) {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
@@ -50,9 +57,24 @@ export function Anmeldung({ demoBetrieb }: { demoBetrieb: boolean }) {
         </p>
       ) : null}
 
-      <Button type="submit" size="lg" className="mt-6 w-full" disabled={laedt}>
+      <Button
+        type="submit"
+        size="lg"
+        className="mt-6 w-full"
+        disabled={laedt || zugangFehlt}
+      >
         {laedt ? "Wird geprüft …" : "Anmelden"}
       </Button>
+
+      {zugangFehlt ? (
+        <p className="mt-5 rounded-[var(--radius-sm)] border border-warn/25 bg-warn-veil px-4 py-3 text-[0.8125rem] leading-relaxed text-warn">
+          <strong>Noch kein Zugang eingerichtet.</strong> Der eingebaute
+          Demozugang gilt nur auf dem eigenen Rechner — an einer öffentlichen
+          Adresse wäre ein allgemein bekannter Code gleichbedeutend mit einer
+          offenen Tür zu allen Kundendaten. Tragen Sie DEALERS in den
+          Umgebungsvariablen ein und liefern Sie neu aus.
+        </p>
+      ) : null}
 
       {demoBetrieb ? (
         <p className="mt-5 rounded-[var(--radius-sm)] border border-warn/25 bg-warn-veil px-4 py-3 text-xs leading-relaxed text-warn">

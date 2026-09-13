@@ -562,9 +562,30 @@ DEALERS='[{"id":"nordstern","name":"Autohaus Nordstern","monogram":"AN",
            "email":"verkauf@example.de","code":"…"}]'
 ```
 
-Einen Code erzeugen: `openssl rand -base64 18`. Ohne gesetzte Variable ist ein
-**Demozugang mit dem Code `demo`** aktiv — praktisch für Vorführungen, vor dem
-Livegang aber zwingend zu ersetzen.
+Alles in **eine Zeile**, ohne Umbrüche. Einen Code erzeugen:
+`openssl rand -base64 18`.
+
+**Ohne `DEALERS` ist die Anmeldung gesperrt.** Das ist Absicht: Wer den
+Händlerbereich öffnen kann, sieht jeden Vorgang mit Kundenname, E-Mail-Adresse
+und Fahrzeug. Ein allgemein bekannter Zugangscode an einer öffentlichen Adresse
+wäre gleichbedeutend mit einer offenen Tür.
+
+Zum Ausprobieren auf dem eigenen Rechner lässt sich der eingebaute Demozugang
+mit dem Code `demo` freischalten:
+
+```bash
+# nur in .env.local auf dem eigenen Rechner – niemals beim Hoster setzen
+HAENDLER_DEMO="1"
+```
+
+Die Freigabe ist bewusst ausdrücklich und wird nicht aus der Umgebung erraten.
+`next start` setzt `NODE_ENV` auch auf dem eigenen Rechner auf `production`;
+eine Erkennung darüber hätte den Demozugang je nach Startart mal gesperrt und
+mal geöffnet. Bei einer Tür, hinter der Kundendaten liegen, ist die sichere
+Voreinstellung „zu, solange niemand ausdrücklich aufmacht".
+
+Sind `DEALERS` gesetzt, gilt ausschließlich die dort hinterlegte Liste — der
+Code `demo` wird dann abgewiesen, auch wenn `HAENDLER_DEMO` gesetzt sein sollte.
 
 > **Grenze der jetzigen Lösung.** Alle im Autohaus teilen sich einen
 > Zugangscode. Es gibt keine persönlichen Konten, keine Rollen, keine

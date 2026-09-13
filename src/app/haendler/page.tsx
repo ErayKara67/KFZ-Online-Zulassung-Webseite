@@ -3,7 +3,12 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { Anmeldung } from "@/components/haendler/anmeldung";
 import { Container, Eyebrow } from "@/components/ui";
-import { dealerAusSitzung, demoBetrieb, SITZUNGSCOOKIE } from "@/lib/dealers";
+import {
+  dealerAusSitzung,
+  demoBetrieb,
+  zugangFehlt,
+  SITZUNGSCOOKIE,
+} from "@/lib/dealers";
 
 export const metadata: Metadata = {
   title: "Händlerzugang",
@@ -25,7 +30,7 @@ export default async function Page() {
         gerade am Zug ist und welche Wagen übergeben werden können.
       </p>
       <div className="mt-8">
-        <Anmeldung demoBetrieb={demoBetrieb} />
+        <Anmeldung demoBetrieb={demoBetrieb} zugangFehlt={zugangFehlt} />
       </div>
     </Container>
   );

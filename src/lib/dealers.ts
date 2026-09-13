@@ -24,12 +24,28 @@ export interface Dealer {
 }
 
 /**
+ * Der eingebaute Demozugang mit dem Code „demo" muss ausdrücklich
+ * eingeschaltet werden: HAENDLER_DEMO="1".
+ *
+ * Warum nicht automatisch erkennen, ob die Anwendung öffentlich läuft? Weil
+ * jede Erkennung daneben liegen kann — `next start` setzt NODE_ENV etwa auch
+ * auf dem eigenen Rechner auf „production". Läge der Demozugang an einer
+ * öffentlichen Adresse offen, könnte jeder die Vorgangsliste mit Kundennamen,
+ * E-Mail-Adressen und Fahrzeugen einsehen. Eine falsche Vermutung darf diesen
+ * Preis nicht haben, also gilt: zu, solange nicht ausdrücklich aufgemacht.
+ *
+ * Zum Ausprobieren auf dem eigenen Rechner die Zeile in .env.local setzen — auf
+ * dem Hoster einfach weglassen.
+ */
+const demoAusdruecklichErlaubt = process.env.HAENDLER_DEMO === "1";
+
+/**
  * Konfiguration über DEALERS als JSON-Liste, zum Beispiel:
  * [{"id":"nordstern","name":"Autohaus Nordstern","monogram":"AN",
  *   "email":"verkauf@example.de","code":"…"}]
  *
- * Ohne Konfiguration steht ein Demozugang bereit, damit sich das Portal
- * vorführen lässt. Der Demozugang ist im Live-Betrieb gesperrt.
+ * Ohne DEALERS und ohne HAENDLER_DEMO gibt es gar keinen Zugang: lieber eine
+ * Anmeldung, die niemand benutzen kann, als eine, die jeder benutzen kann.
  */
 export function getDealers(): Dealer[] {
   const roh = process.env.DEALERS;
@@ -37,9 +53,19 @@ export function getDealers(): Dealer[] {
     try {
       const liste = JSON.parse(roh) as Dealer[];
       if (Array.isArray(liste) && liste.length > 0) return liste;
+      console.error("[dealers] DEALERS ist eine leere Liste – kein Zugang eingerichtet.");
     } catch {
-      console.error("[dealers] DEALERS ist kein gültiges JSON – Demozugang aktiv.");
+      console.error("[dealers] DEALERS ist kein gültiges JSON – kein Zugang eingerichtet.");
     }
+  }
+
+  if (!demoAusdruecklichErlaubt) {
+    console.error(
+      "[dealers] Kein Händlerzugang eingerichtet — die Anmeldung ist gesperrt. " +
+        "Für den Betrieb DEALERS setzen; zum Ausprobieren auf dem eigenen " +
+        'Rechner HAENDLER_DEMO="1" (siehe README).',
+    );
+    return [];
   }
 
   return [
@@ -53,7 +79,11 @@ export function getDealers(): Dealer[] {
   ];
 }
 
-export const demoBetrieb = !process.env.DEALERS;
+/** true, solange der eingebaute Demozugang gilt – nur nach ausdrücklicher Freigabe */
+export const demoBetrieb = !process.env.DEALERS && demoAusdruecklichErlaubt;
+
+/** true, wenn niemand eingetragen und der Demozugang nicht freigegeben ist */
+export const zugangFehlt = !process.env.DEALERS && !demoAusdruecklichErlaubt;
 
 export function findeDealer(id: string): Dealer | undefined {
   return getDealers().find((d) => d.id === id);
