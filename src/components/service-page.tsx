@@ -102,7 +102,7 @@ export function ServicePage({ slug }: { slug: string }) {
                   href={`/bestellung?leistung=${service.slug}`}
                   className="mt-6 w-full"
                 >
-                  Auftrag starten
+                  Jetzt beauftragen
                 </ButtonLink>
               </Card>
             )}

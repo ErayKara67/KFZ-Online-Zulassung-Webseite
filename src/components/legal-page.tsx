@@ -1,22 +1,35 @@
 import type { ReactNode } from "react";
-import { Container } from "./ui";
+import { Container, Eyebrow } from "./ui";
 
+/**
+ * Rechtstexte.
+ *
+ * Der Kopfbereich folgt bewusst demselben Muster wie Kontakt, Ratgeber und
+ * Zulassungsstellen: gleiche Fläche, gleicher Innenabstand, gleiche
+ * Überschriftengröße, gleiche Kategoriezeile darüber. Rechtstexte sahen vorher
+ * eine Stufe kleiner aus als der Rest — das liest sich wie eine fremde Seite,
+ * und ausgerechnet beim Impressum ist der Eindruck „gehört das überhaupt
+ * hierher?" der falsche.
+ */
 export function LegalPage({
   title,
   updated,
   children,
   notice = true,
+  eyebrow = "Rechtliches",
 }: {
   title: string;
   updated?: string;
   children: ReactNode;
   notice?: boolean;
+  eyebrow?: string;
 }) {
   return (
     <>
       <div className="border-b border-line bg-card">
-        <Container className="py-12">
-          <h1 className="text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+        <Container className="py-14 lg:py-20">
+          <Eyebrow>{eyebrow}</Eyebrow>
+          <h1 className="text-balance text-4xl font-semibold leading-tight tracking-tight text-ink sm:text-5xl">
             {title}
           </h1>
           {updated ? (

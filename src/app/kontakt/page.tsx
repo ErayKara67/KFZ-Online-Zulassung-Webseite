@@ -14,9 +14,9 @@ export default function Page() {
   return (
     <>
       <div className="border-b border-line bg-card">
-        <Container className="py-14">
+        <Container className="py-14 lg:py-20">
           <Eyebrow>Support</Eyebrow>
-          <h1 className="text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
+          <h1 className="text-balance text-4xl font-semibold leading-tight tracking-tight text-ink sm:text-5xl">
             Kontakt
           </h1>
           <Lead>

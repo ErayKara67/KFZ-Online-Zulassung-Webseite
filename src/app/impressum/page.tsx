@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function Page() {
   return (
-    <LegalPage title="Impressum">
+    <LegalPage title="Impressum" updated="[Datum eintragen]">
       <h2>Angaben gemäß § 5 DDG</h2>
       <p>
         {site.company.legalName}
