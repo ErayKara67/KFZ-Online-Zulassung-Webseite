@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { districts, type District } from "@/lib/districts";
+import { buergerDistricts, districts, type District } from "@/lib/districts";
 
 /**
  * Suchfeld für das Unterscheidungszeichen.
@@ -10,6 +10,26 @@ import { districts, type District } from "@/lib/districts";
  * Liste ist mit der Tastatur bedienbar und zeigt den Zulassungsbezirk direkt
  * an — wer „Herne" tippt, findet HER, ohne das Kürzel zu kennen.
  */
+/**
+ * Vergleichsform für die Suche.
+ *
+ * Auf dem Handy tippt kaum jemand „München" mit Umlaut — „Muenchen" oder
+ * „Munchen" ist der Normalfall. Ohne diese Umformung findet die Suche dann
+ * nichts, und der Eindruck ist: „meine Stadt gibt es hier nicht".
+ */
+function schlicht(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    /* zerlegt verbliebene Akzente und wirft die Zeichen weg */
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
 export function DistrictCombobox({
   value,
   onChange,
@@ -31,15 +51,16 @@ export function DistrictCombobox({
   const huelle = useRef<HTMLDivElement>(null);
 
   const treffer = useMemo(() => {
-    const q = (suche || value).trim().toLowerCase();
+    const q = schlicht(suche || value);
     if (!q) return [];
     const nachKuerzel: District[] = [];
     const nachOrt: District[] = [];
-    for (const d of districts) {
-      const code = d.code.toLowerCase();
+    /* Behördenkennzeichen erscheinen nicht in der Auswahl – siehe districts.ts */
+    for (const d of buergerDistricts) {
+      const code = schlicht(d.code);
       if (code === q) nachKuerzel.unshift(d);
       else if (code.startsWith(q)) nachKuerzel.push(d);
-      else if (d.city.toLowerCase().includes(q)) nachOrt.push(d);
+      else if (schlicht(d.city).includes(q)) nachOrt.push(d);
     }
     return [...nachKuerzel, ...nachOrt].slice(0, 8);
   }, [suche, value]);

@@ -20,7 +20,7 @@ import {
   shippingOptions,
   vehicleSchema,
 } from "@/lib/order";
-import { districts } from "@/lib/districts";
+import { DistrictCombobox } from "../district-combobox";
 import { IkfzStep, type IkfzDraft } from "./ikfz-step";
 import { VOLLMACHT_TEXT, VOLLMACHT_VERSION } from "@/lib/ikfz/vollmacht-text";
 import { Button, Field, inputClass, Check } from "../ui";
@@ -607,17 +607,19 @@ export function OrderWizard() {
                       </span>
                     </span>
                     <span className="mt-2 block text-sm leading-relaxed text-ink-2">
-                      Statt auf Papiere zu warten: Wir liefern die Schilder vorab
-                      per Express und reichen den Antrag digital ein. Sie erhalten
-                      den vorläufigen Zulassungsnachweis und dürfen bis zu 14 Tage
-                      fahren, während Zulassungsbescheinigung und Plaketten per
-                      Post kommen.
+                      Statt auf die Papiere zu warten: Wir schicken die Schilder
+                      vorab per Express und reichen den Antrag digital ein.
+                      Sobald die Behörde entschieden hat, bekommen Sie einen
+                      Nachweis zum Ausdrucken — damit dürfen Sie sofort losfahren.
+                      Die amtlichen Papiere und die Plaketten kommen innerhalb von
+                      14 Tagen per Post.
                     </span>
-                    <span className="mt-3 block text-xs leading-relaxed text-ink-2">
-                      Voraussetzungen: Fahrzeugpapiere mit Sicherheitscode,
-                      gültige Hauptuntersuchung, eVB-Nummer, SEPA-Mandat und eine
-                      elektronische Identifizierung. Wir prüfen das im Verlauf
-                      Schritt für Schritt.
+                    <span className="mt-3 block text-[0.8125rem] leading-relaxed text-ink-2 sm:text-xs">
+                      Dafür brauchen Sie Fahrzeugpapiere mit Rubbelfeld, eine
+                      gültige Hauptuntersuchung, die eVB-Nummer Ihrer Versicherung,
+                      Ihre Bankverbindung für die Kfz-Steuer und einen Ausweis mit
+                      Online-Funktion. Was genau, fragen wir Schritt für Schritt ab
+                      — Sie müssen jetzt nichts heraussuchen.
                     </span>
                   </span>
                 </label>
@@ -627,34 +629,33 @@ export function OrderWizard() {
             {sections.includes("plate") ? (
               <>
                 <fieldset className="mb-8">
-                  <legend className="mb-3 text-sm font-semibold text-ink">
+                  <legend className="mb-1.5 text-sm font-semibold text-ink">
                     Ihr Wunschkennzeichen
                   </legend>
+                  <p className="mb-4 text-[0.8125rem] leading-relaxed text-ink-3 sm:text-xs">
+                    Ortskürzel, dann ein bis zwei Buchstaben und ein bis vier
+                    Ziffern — zum Beispiel HER-EK 93. Beim Ortskürzel können Sie
+                    auch den Stadtnamen eingeben.
+                  </p>
                   <div className="grid grid-cols-3 gap-3 sm:max-w-md">
-                    <Field label="Ort" htmlFor="w-district" required error={errors["plate.district"]}>
-                      <input
+                    {/*
+                      Suchfeld statt Auswahlliste: Die frühere Datalist warf alle
+                      Bezirke auf einmal aus und war bei 400 Einträgen
+                      abgeschnitten — wer in München oder Stuttgart wohnt, bekam
+                      gar keinen Vorschlag mehr. Das Suchfeld findet nach Kürzel
+                      und nach Ortsname und zeigt an, welche Stadt dahintersteht.
+                    */}
+                    <Field
+                      label="Ortskürzel"
+                      htmlFor="w-district"
+                      required
+                      error={errors["plate.district"]}
+                    >
+                      <DistrictCombobox
                         id="w-district"
-                        autoComplete="off"
-                        autoCapitalize="characters"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        list="w-districts"
-                        maxLength={3}
                         value={draft.plate.district}
-                        onChange={(e) =>
-                          patch("plate", {
-                            district: e.target.value.toUpperCase().replace(/[^A-ZÄÖÜ]/g, ""),
-                          })
-                        }
-                        className={`${inputClass} text-center text-lg font-bold uppercase`}
+                        onChange={(kuerzel) => patch("plate", { district: kuerzel })}
                       />
-                      <datalist id="w-districts">
-                        {districts.slice(0, 400).map((d) => (
-                          <option key={`${d.code}-${d.city}`} value={d.code}>
-                            {d.city}
-                          </option>
-                        ))}
-                      </datalist>
                     </Field>
                     <Field label="Buchst." htmlFor="w-letters" required error={errors["plate.letters"]}>
                       <input
@@ -805,7 +806,7 @@ export function OrderWizard() {
                 label="Nummer der Zulassungsbescheinigung Teil II"
                 htmlFor="v-zb2"
                 required
-                hint="Teil II ist der frühere Fahrzeugbrief — das Dokument, das zu Hause bleibt. Die Nummer steht dort neben dem grünen Rubbelfeld und zusätzlich oben auf dem Fahrzeugschein."
+                hint="Teil II ist der frühere Fahrzeugbrief — das Dokument, das zu Hause bleibt. Die Nummer steht dort neben dem Rubbelfeld; sie ist außerdem oben auf dem Fahrzeugschein aufgedruckt, falls der Brief gerade nicht greifbar ist."
                 error={errors["vehicle.zbTeil2"]}
               >
                 <input

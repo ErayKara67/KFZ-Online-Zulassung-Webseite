@@ -195,8 +195,70 @@ export default function Page() {
         </ol>
       </Section>
 
-      {/* Offene Punkte */}
+      {/*
+        Kosten und Einstieg.
+
+        Fehlte bisher komplett — dabei ist „was kostet mich das?" die erste
+        Frage, die ein Autohaus stellt, noch vor jedem Funktionsversprechen.
+        Ohne Antwort vermutet der Gegenüber das Teuerste.
+      */}
       <Section tone="base">
+        <Eyebrow>Was es kostet</Eyebrow>
+        <H2>Für Ihr Haus: nichts</H2>
+        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-2">
+          Die Kundin oder der Kunde bezahlt den Festpreis der Leistung direkt
+          online — so wie bei einer Bestellung im Netz. Ihr Haus tritt nicht in
+          Vorleistung und bekommt keine Rechnung von uns.
+        </p>
+
+        <dl className="mt-10 grid gap-5 sm:grid-cols-3">
+          {[
+            {
+              t: "Keine Einrichtungsgebühr",
+              d: "Der Zugang wird freigeschaltet, fertig. Keine Installation, keine Software auf Ihren Rechnern.",
+            },
+            {
+              t: "Keine monatlichen Kosten",
+              d: "Kein Abo, keine Grundgebühr. Auch dann nicht, wenn ein Monat lang kein Vorgang läuft.",
+            },
+            {
+              t: "Keine Mindestmenge",
+              d: "Ob ein Fahrzeug im Monat oder fünfzig — die Bedingungen bleiben gleich.",
+            },
+          ].map((k) => (
+            <div
+              key={k.t}
+              className="rounded-[var(--radius-card)] border border-line bg-card p-6"
+            >
+              <dt className="text-base font-bold text-ink">{k.t}</dt>
+              <dd className="mt-2 text-sm leading-relaxed text-ink-2">{k.d}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className="mt-10 rounded-[var(--radius-card)] border border-line bg-card p-7">
+          <h3 className="text-base font-bold text-ink">So fangen wir an</h3>
+          <ol className="mt-4 grid gap-4 text-sm leading-relaxed text-ink-2 sm:grid-cols-3">
+            <li>
+              <span className="font-semibold text-accent-bright">1.</span> Wir
+              richten einen Zugang für Ihr Haus ein und geben Ihnen den
+              Zugangscode.
+            </li>
+            <li>
+              <span className="font-semibold text-accent-bright">2.</span> Ihr
+              Verkauf legt den ersten Vorgang an — Name, E-Mail, Leistung.
+            </li>
+            <li>
+              <span className="font-semibold text-accent-bright">3.</span> Sie
+              sehen am ersten echten Fahrzeug, ob es trägt. Ohne Vertrag, ohne
+              Kündigungsfrist.
+            </li>
+          </ol>
+        </div>
+      </Section>
+
+      {/* Offene Punkte */}
+      <Section tone="raised">
         <div className="grid gap-12 lg:grid-cols-[1fr_1fr]">
           <div>
             <Eyebrow>Ehrlich gesagt</Eyebrow>

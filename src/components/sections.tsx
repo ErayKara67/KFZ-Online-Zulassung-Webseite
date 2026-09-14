@@ -200,11 +200,42 @@ export function SofortSection() {
               </li>
             ))}
           </ol>
-          <p className="mt-7 border-t border-line pt-5 text-xs leading-relaxed text-ink-3">
-            Voraussetzung sind Fahrzeugpapiere mit Sicherheitscode, gültige
-            Hauptuntersuchung, eVB-Nummer, SEPA-Mandat und eine elektronische
-            Identifizierung. Wir prüfen das im Auftrag Schritt für Schritt.
-          </p>
+          {/*
+            Vorher stand hier ein Satz mit fünf Fachbegriffen hintereinander.
+            Wer nicht weiß, was eine eVB-Nummer ist, liest daraus vor allem:
+            „kompliziert, lieber doch zur Behörde". Dieselbe Information als
+            Liste, jeder Punkt in einem Satz erklärt.
+          */}
+          <div className="mt-7 border-t border-line pt-5">
+            <p className="text-[0.8125rem] font-semibold text-ink sm:text-xs">
+              Was Sie dafür brauchen
+            </p>
+            <ul className="mt-2.5 space-y-1.5 text-[0.8125rem] leading-relaxed text-ink-3 sm:text-xs">
+              <li>
+                <strong className="font-medium text-ink-2">Fahrzeugpapiere mit Rubbelfeld</strong>{" "}
+                — Zulassungsbescheinigung Teil II ab 2018, Teil I ab 2015.
+              </li>
+              <li>
+                <strong className="font-medium text-ink-2">Gültige Hauptuntersuchung</strong>{" "}
+                — der TÜV-Termin darf nicht abgelaufen sein.
+              </li>
+              <li>
+                <strong className="font-medium text-ink-2">eVB-Nummer</strong> — sieben
+                Zeichen, die Ihre Kfz-Versicherung kostenlos ausstellt.
+              </li>
+              <li>
+                <strong className="font-medium text-ink-2">Ihre Bankverbindung</strong>{" "}
+                — für die Kfz-Steuer, die das Hauptzollamt einzieht.
+              </li>
+              <li>
+                <strong className="font-medium text-ink-2">Ausweis mit Online-Funktion</strong>{" "}
+                — oder Sie identifizieren sich per Video über unseren Partner.
+              </li>
+            </ul>
+            <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink-3 sm:text-xs">
+              Fehlt etwas, sagen wir es Ihnen im Auftrag — nicht erst hinterher.
+            </p>
+          </div>
         </Card>
       </div>
     </Section>

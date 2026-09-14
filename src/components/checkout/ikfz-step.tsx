@@ -88,10 +88,11 @@ export function IkfzStep({
         <legend className="mb-1 text-sm font-semibold text-ink">
           Sicherheitscodes aus den Fahrzeugpapieren
         </legend>
-        <p className="mb-5 text-xs leading-relaxed text-ink-2">
-          Die Codes stehen unter einem silbernen Feld, das Sie freirubbeln. Legen
-          Sie es erst frei, wenn Sie den Auftrag abschließen – ein einmal
-          freigelegtes Feld gilt als verbraucht.
+        <p className="mb-5 text-[0.8125rem] leading-relaxed text-ink-2 sm:text-xs">
+          Die Codes sind mit einem Rubbelfeld abgedeckt, das Sie wie bei einem
+          Rubbellos freilegen. Tun Sie das bitte erst jetzt, beim Abschließen des
+          Auftrags: Ein einmal freigelegtes Feld gilt als verbraucht, und für ein
+          neues Dokument fällt eine Gebühr bei der Zulassungsstelle an.
         </p>
 
         <div className="grid gap-5 sm:grid-cols-2">

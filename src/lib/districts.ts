@@ -299,7 +299,7 @@ HIG|Heiligenstadt|
 HS|Heinsberg|Nordrhein-Westfalen
 HE|Helmstedt|
 HF|Herford|Nordrhein-Westfalen
-HER|Herne|
+HER|Herne|Nordrhein-Westfalen
 HEB|Hersbruck|
 HEF|Hersfeld-Rotenburg (Bad Hersfeld)|Hessen
 HZ|Herzberg|Sachsen-Anhalt
@@ -809,6 +809,37 @@ const codeSet = new Set(districts.map((d) => d.code));
 export function isKnownDistrict(code: string): boolean {
   return codeSet.has(code.toUpperCase());
 }
+
+/**
+ * Unterscheidungszeichen, die an Privatpersonen nie vergeben werden.
+ *
+ * Der Datensatz enthält auch Kennzeichen von Bundes- und Landesbehörden. Sie
+ * gehören dorthin — eine Kennzeichenprüfung muss „Y" als gültiges Zeichen
+ * kennen. In der Auswahl beim Bestellen haben sie aber nichts verloren: Wer
+ * ein Auto anmelden will, bekommt zwischen Aachen und Alzey „Bundeswehr" und
+ * „Deutsche Bundespost" vorgeschlagen und fragt sich zu Recht, wie ernst
+ * dieser Dienst zu nehmen ist.
+ *
+ * Historische Bezirkskürzel bleiben bewusst drin: Viele wurden im Zuge der
+ * Kennzeichenliberalisierung wieder freigegeben, und ohne das amtliche
+ * Verzeichnis lässt sich nicht sicher sagen, welche. Etwas zu viel anzubieten
+ * ist hier der harmlosere Fehler.
+ */
+const BEHOERDENZEICHEN = new Set([
+  /* Bund */
+  "Y", "X", "BD", "BG", "BW", "DB", "BP",
+  /* Landesregierungen */
+  "BWL", "BYL", "BBL", "HEL", "MVL", "NL", "NRW", "RWL",
+  "RPL", "SAL", "LSN", "LSA", "THL", "SH",
+]);
+
+/**
+ * Die Bezirke, die in Auswahlfeldern für Kundinnen und Kunden erscheinen.
+ * Für Prüfung und Nachschlagen weiterhin `districts` verwenden.
+ */
+export const buergerDistricts: District[] = districts.filter(
+  (d) => !BEHOERDENZEICHEN.has(d.code),
+);
 
 export function findDistricts(query: string, limit = 8): District[] {
   const q = query.trim().toLowerCase();
