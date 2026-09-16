@@ -10,3 +10,7 @@ npm-debug.log*
 .data
 next-env.d.ts
 tsconfig.tsbuildinfo
+
+# Screenshots und Zwischenstände, die die Claude-App hier ablegt.
+# Gehören nicht ins Repository und würden sonst mit ausgeliefert.
+Claude outputs/

@@ -42,6 +42,13 @@ export interface TimelineEntry {
   note?: string;
 }
 
+/** Interner Vermerk zu einem Vorfall – nicht Teil des Fortschritts */
+export interface Vermerk {
+  text: string;
+  art: "info" | "warnung" | "geld";
+  am: string;
+}
+
 export interface OrderIkfz {
   /** Sofortzulassung nach i-Kfz Stufe 4 gebucht */
   aktiv: boolean;
@@ -103,6 +110,8 @@ export interface StoredOrder {
     };
   };
   timeline: TimelineEntry[];
+  /** Vorfälle für die Sachbearbeitung – Rückbuchung, geplatzte Zahlung, Warnung */
+  vermerke?: Vermerk[];
   ikfz?: OrderIkfz;
   /** Ausgeführte Erstattungen – Nachweis für Buchhaltung und Rückfragen */
   erstattungen?: {
@@ -123,6 +132,27 @@ export function withTimeline(
 ): TimelineEntry[] {
   if (timeline.some((t) => t.key === key)) return timeline;
   return [...timeline, { key, at: new Date().toISOString(), note }];
+}
+
+/**
+ * Hängt einen internen Vermerk an den Vorgang.
+ *
+ * Abgegrenzt vom Zeitstrahl: Der bildet den Fortschritt ab und nimmt jeden
+ * Schritt genau einmal auf — „bezahlt" gibt es nicht zweimal. Vorfälle wie eine
+ * Rückbuchung, eine geplatzte Lastschrift oder eine Betrugswarnung passen dort
+ * nicht hinein; sie würden stillschweigend verworfen, weil ihr Schritt schon
+ * belegt ist.
+ *
+ * Vermerke bleiben in der Sachbearbeitung. Die Auftragsverfolgung für Kundinnen
+ * und Kunden gibt sie nicht aus — „Betrugswarnung" ist nichts, was jemand über
+ * den eigenen Vorgang lesen sollte.
+ */
+export function mitVermerk(
+  vermerke: Vermerk[] | undefined,
+  text: string,
+  art: Vermerk["art"] = "info",
+): Vermerk[] {
+  return [...(vermerke ?? []), { text, art, am: new Date().toISOString() }];
 }
 
 export async function saveOrder(order: StoredOrder): Promise<void> {

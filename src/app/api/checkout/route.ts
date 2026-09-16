@@ -49,6 +49,17 @@ export async function POST(request: Request) {
       customer_email: order.email,
       client_reference_id: order.id,
       metadata: { orderId: order.id, service: order.service },
+      /*
+       * Dieselbe Auftragsnummer noch einmal an der Zahlung selbst.
+       *
+       * Bei einer Rückbuchung, einer Erstattung aus dem Stripe-Dashboard oder
+       * einer Betrugswarnung meldet Stripe nur die Zahlung — die Sitzung, an
+       * der die obere metadata hängt, taucht in diesen Meldungen nicht auf.
+       * Ohne diese Zeile ließe sich der zugehörige Auftrag nicht finden.
+       */
+      payment_intent_data: {
+        metadata: { orderId: order.id, service: order.service },
+      },
       line_items: [
         {
           quantity: 1,

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Check } from "./ui";
 import { LicensePlate } from "./license-plate";
+import { formatPrice } from "@/lib/services";
 import { leseJson } from "@/lib/antwort";
 
 interface TimelineEntry {
@@ -26,6 +27,7 @@ interface AuftragsStatus {
   id: string;
   status: string;
   service: string;
+  totalCents: number;
   timeline: TimelineEntry[];
   ikfz: {
     aktiv: boolean;
@@ -124,6 +126,7 @@ export function OrderTracker({ id, code }: { id: string; code: string }) {
   const [daten, setDaten] = useState<AuftragsStatus | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
   const [hinweis, setHinweis] = useState<string | null>(null);
+  const [zahltGerade, setZahltGerade] = useState(false);
   const [laden, setLaden] = useState(true);
   const [tick, setTick] = useState(0);
 
@@ -162,6 +165,35 @@ export function OrderTracker({ id, code }: { id: string; code: string }) {
     const t = setInterval(() => void holen(), 20_000);
     return () => clearInterval(t);
   }, [holen]);
+
+  /**
+   * Zahlung (erneut) starten.
+   *
+   * Eine Bezahlseite von Stripe verfällt nach rund 24 Stunden. Wer den Vorgang
+   * damals abgebrochen hat oder dessen Lastschrift geplatzt ist, hätte ohne
+   * diesen Knopf keinen Weg zurück — die alten Angaben wären zwar gespeichert,
+   * aber nicht mehr bezahlbar. /api/checkout erzeugt für jeden offenen Auftrag
+   * eine frische Seite.
+   */
+  async function zahlungStarten() {
+    setHinweis(null);
+    setZahltGerade(true);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: id }),
+      });
+      const { ok, daten, fehler: meldung } = await leseJson<{ url: string }>(res);
+      if (!ok || !daten?.url) {
+        throw new Error(meldung ?? "Die Zahlung konnte nicht gestartet werden.");
+      }
+      window.location.assign(daten.url);
+    } catch (e) {
+      setHinweis(e instanceof Error ? e.message : "Die Zahlung konnte nicht gestartet werden.");
+      setZahltGerade(false);
+    }
+  }
 
   async function aktion(name: string) {
     setHinweis(null);
@@ -225,6 +257,30 @@ export function OrderTracker({ id, code }: { id: string; code: string }) {
   return (
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_21rem]">
       <div>
+        {/* Offener Betrag — steht bewusst ganz oben, das ist hier das Wichtigste */}
+        {daten.status === "offen" ? (
+          <div className="mb-9 rounded-[var(--radius-card)] border-2 border-accent/40 bg-accent-veil p-6">
+            <p className="text-[0.75rem] font-semibold uppercase tracking-wider text-accent-bright sm:text-[0.7rem]">
+              Zahlung offen
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-ink">
+              Ihr Auftrag wartet auf die Zahlung
+            </h2>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-2">
+              Ihre Angaben sind gespeichert — Sie müssen nichts erneut ausfüllen.
+              Wir beginnen mit der Bearbeitung, sobald die Zahlung eingegangen ist.
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-4">
+              <Button size="lg" onClick={() => void zahlungStarten()} disabled={zahltGerade}>
+                {zahltGerade ? "Einen Moment …" : "Jetzt bezahlen"}
+              </Button>
+              <span className="text-lg font-semibold text-ink tnum">
+                {formatPrice(daten.totalCents)}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
         {/* Fahrberechtigung */}
         {bescheid ? (
           <div
