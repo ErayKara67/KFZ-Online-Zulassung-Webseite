@@ -1,0 +1,22 @@
+# Zeilenenden für alle Beteiligten gleich festlegen.
+#
+# Windows beendet Zeilen traditionell mit zwei Zeichen (CRLF), Linux und macOS
+# mit einem (LF). Git rechnet das auf Windows standardmäßig hin und her — was
+# dazu führt, dass eine Datei als „komplett geändert" erscheint, obwohl nur die
+# unsichtbaren Zeilenenden anders sind.
+#
+# text=auto: Git erkennt selbst, was Text ist und was nicht (Bilder bleiben
+#            unangetastet).
+# eol=lf:    Textdateien liegen überall mit LF vor — so, wie der Build-Server
+#            von Vercel sie ohnehin erwartet.
+* text=auto eol=lf
+
+# Zur Sicherheit ausdrücklich als Binärdatei behandeln
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary

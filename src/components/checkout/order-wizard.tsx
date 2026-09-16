@@ -429,6 +429,7 @@ export function OrderWizard() {
       const orderRes = await fetch("/api/bestellung", { method: "POST", body: form });
       const { ok: orderOk, daten: orderData, fehler: orderFehler } = await leseJson<{
         orderId: string;
+        accessToken: string;
       }>(orderRes);
       if (!orderOk || !orderData) {
         throw new Error(orderFehler ?? "Auftrag konnte nicht angelegt werden.");
@@ -437,7 +438,10 @@ export function OrderWizard() {
       const payRes = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: orderData.orderId }),
+        body: JSON.stringify({
+          orderId: orderData.orderId,
+          code: orderData.accessToken,
+        }),
       });
       const { ok: payOk, daten: payData, fehler: payFehler } = await leseJson<{
         url: string;

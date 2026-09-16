@@ -1,13 +1,25 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getOrder, updateOrder, withTimeline } from "@/lib/orders-store";
+import { updateOrder, withTimeline } from "@/lib/orders-store";
+import { auftragMitCode } from "@/lib/order-access";
 import { starteBearbeitung } from "@/lib/order-flow";
 import { baseUrl, getStripe, stripeConfigured } from "@/lib/stripe";
 import { getService } from "@/lib/services";
 
 export const runtime = "nodejs";
 
-const schema = z.object({ orderId: z.string().min(3).max(40) });
+/*
+ * Der Zugriffscode ist Pflicht.
+ *
+ * Ohne ihn genügte die Auftragsnummer, um eine Bezahlseite zu erzeugen — und
+ * die zeigt Leistung, Betrag und die vorausgefüllte E-Mail-Adresse der Kundin.
+ * Auftragsnummern stehen in E-Mails und Links; der Code ist das, was den
+ * Vorgang tatsächlich schützt.
+ */
+const schema = z.object({
+  orderId: z.string().min(3).max(40),
+  code: z.string().min(8).max(128),
+});
 
 export async function POST(request: Request) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
@@ -15,9 +27,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
   }
 
-  const order = await getOrder(parsed.data.orderId);
+  const order = await auftragMitCode(parsed.data.orderId, parsed.data.code);
   if (!order) {
-    return NextResponse.json({ error: "Auftrag nicht gefunden." }, { status: 404 });
+    return NextResponse.json(
+      { error: "Auftrag nicht gefunden oder Zugriffscode falsch." },
+      { status: 404 },
+    );
   }
 
   const service = getService(order.service);
@@ -74,7 +89,7 @@ export async function POST(request: Request) {
         },
       ],
       success_url: `${baseUrl()}/bestellung/erfolg?auftrag=${order.id}&code=${order.accessToken}&session={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl()}/bestellung/abbruch?auftrag=${order.id}`,
+      cancel_url: `${baseUrl()}/bestellung/abbruch?auftrag=${order.id}&code=${order.accessToken}`,
     });
 
     await updateOrder(order.id, { paymentRef: session.id });

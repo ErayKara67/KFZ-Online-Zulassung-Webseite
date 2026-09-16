@@ -182,7 +182,7 @@ export function OrderTracker({ id, code }: { id: string; code: string }) {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: id }),
+        body: JSON.stringify({ orderId: id, code }),
       });
       const { ok, daten, fehler: meldung } = await leseJson<{ url: string }>(res);
       if (!ok || !daten?.url) {

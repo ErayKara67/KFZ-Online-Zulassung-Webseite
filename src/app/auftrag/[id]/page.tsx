@@ -21,8 +21,8 @@ export default async function Page({
   return (
     <>
       <div className="border-b border-line bg-card">
-        <Container className="py-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-bright">
+        <Container className="py-10 sm:py-12">
+          <p className="text-[0.75rem] font-semibold uppercase tracking-[0.18em] text-accent-bright sm:text-[0.7rem]">
             Auftragsverfolgung
           </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
